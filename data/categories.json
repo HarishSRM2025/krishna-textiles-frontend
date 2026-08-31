@@ -1,0 +1,17 @@
+[
+  { "id": "mens-wear", "name": "Men's Wear", "emoji": "👔", "color": "#2B4C7E", "nav": true },
+  { "id": "mens-innerwear", "name": "Men's Innerwear", "emoji": "🩲", "color": "#1F3A63", "nav": true, "navLabel": "Innerwear" },
+  { "id": "womens-innerwear", "name": "Women's Innerwear", "emoji": "👙", "color": "#D96C8C", "nav": false },
+  { "id": "womens-wear", "name": "Women's Wear", "emoji": "👗", "color": "#C4577A", "nav": true, "navLabel": "Women" },
+  { "id": "sarees", "name": "Sarees", "emoji": "🥻", "color": "#8B3A62", "nav": true },
+  { "id": "kurtis", "name": "Kurtis", "emoji": "🧵", "color": "#D4A017", "nav": true },
+  { "id": "nightwear", "name": "Nightwear", "emoji": "🌙", "color": "#0B2F5C", "nav": true },
+  { "id": "kids-wear", "name": "Kids Wear", "emoji": "🧒", "color": "#2E9C9C", "nav": true, "navLabel": "Kids" },
+  { "id": "shirts", "name": "Shirts", "emoji": "👕", "color": "#4A78A8", "nav": true },
+  { "id": "tshirts", "name": "T-Shirts", "emoji": "👚", "color": "#E5A100", "nav": true, "navLabel": "T-Shirts" },
+  { "id": "bottomwear", "name": "Bottomwear", "emoji": "👖", "color": "#5B6B7A", "nav": true },
+  { "id": "dupattas-stoles", "name": "Dupattas & Stoles", "emoji": "🧣", "color": "#E0538C", "nav": false },
+  { "id": "dress-materials", "name": "Dress Materials", "emoji": "🧶", "color": "#8E6BAF", "nav": true },
+  { "id": "socks", "name": "Socks", "emoji": "🧦", "color": "#2B2B2B", "nav": false },
+  { "id": "home-textiles", "name": "Home Textiles", "emoji": "🛏️", "color": "#7C8CA5", "nav": false }
+]

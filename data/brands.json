@@ -1,0 +1,12 @@
+[
+  { "id": "jockey", "name": "Jockey", "tagline": "Innerwear & Basics" },
+  { "id": "rupa", "name": "Rupa", "tagline": "Trusted Innerwear" },
+  { "id": "vip", "name": "VIP", "tagline": "Comfort Essentials" },
+  { "id": "dollar", "name": "Dollar", "tagline": "Everyday Wear" },
+  { "id": "luxcozi", "name": "Lux Cozi", "tagline": "Premium Comfort" },
+  { "id": "vimal", "name": "Vimal", "tagline": "Fabric Specialists" },
+  { "id": "enamor", "name": "Enamor", "tagline": "Women's Lingerie" },
+  { "id": "macroman", "name": "Macroman", "tagline": "Men's Fashion" },
+  { "id": "trylo", "name": "Trylo", "tagline": "Value Innerwear" },
+  { "id": "siyarams", "name": "Siyaram's", "tagline": "Fabrics & Apparel" }
+]
