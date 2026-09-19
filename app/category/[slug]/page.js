@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ChevronRight,
@@ -16,10 +16,9 @@ import {
   ArrowUpDown,
   Tag,
   ShoppingBag,
+  Loader2,
 } from "lucide-react";
-import allProducts from "@/data/products.json";
-import categories from "@/data/categories.json";
-import brands from "@/data/brands.json";
+import { api } from "@/lib/api";
 import ProductCard from "@/components/ProductCard";
 import { categoryIconMap } from "@/components/Header";
 import { useCart } from "@/components/CartContext";
@@ -63,9 +62,13 @@ function FilterSection({ title, children, defaultOpen = true }) {
 
 export default function CategoryPage({ params }) {
   const { slug } = params;
-  const category = categories.find((c) => c.id === slug);
-  const title = slug === "all" ? "All Products & Catalog" : category?.name || "Products";
   const { addItem } = useCart();
+
+  // API data state
+  const [allProducts, setAllProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Filter state
   const [selectedBrands, setSelectedBrands] = useState([]);
@@ -79,23 +82,71 @@ export default function CategoryPage({ params }) {
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [brandSearch, setBrandSearch] = useState("");
 
-  const base = useMemo(() => {
-    if (slug === "all") return allProducts;
-    return allProducts.filter((p) => p.category === slug);
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        const [prodData, catData, brandData] = await Promise.all([
+          api.products.getAll(slug !== "all" ? { category: slug } : {}),
+          api.categories.getAll(),
+          api.brands.getAll(),
+        ]);
+        const products = Array.isArray(prodData) ? prodData : (prodData.data || []);
+        const cats = Array.isArray(catData) ? catData : (catData.data || []);
+        const brnds = Array.isArray(brandData) ? brandData : (brandData.data || []);
+        setAllProducts(products);
+        setCategories(cats);
+        setBrands(brnds);
+        const maxP = Math.max(...products.map((p) => Number(p.price) || 0), 500);
+        setPriceRange([0, maxP]);
+      } catch (e) {
+        console.error("Category page load error:", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
   }, [slug]);
 
+  const category = categories.find((c) => c.slug === slug || c.id === slug);
+  const title = slug === "all" ? "All Products & Catalog" : category?.name || "Products";
+
+  const base = useMemo(() => allProducts, [allProducts]);
+
+  function productMatchesBrand(p, b) {
+    if (!b) return false;
+    return (
+      p.brandRefId === b.id ||
+      p.brandRef?.id === b.id ||
+      p.brandId === b.id ||
+      p.brandId === b.slug ||
+      p.brandRef?.slug === b.slug ||
+      (typeof p.brand === "string" && p.brand.toLowerCase() === b.name?.toLowerCase())
+    );
+  }
+
+  function productMatchesCategory(p, c) {
+    if (!c) return false;
+    return (
+      p.categoryId === c.id ||
+      p.categoryRef?.id === c.id ||
+      p.category === c.id ||
+      p.category === c.slug ||
+      p.categoryRef?.slug === c.slug ||
+      (typeof p.category === "string" && p.category.toLowerCase() === c.name?.toLowerCase())
+    );
+  }
+
   const availableBrands = useMemo(() => {
-    const ids = new Set(base.map((p) => p.brandId));
-    return brands.filter((b) => ids.has(b.id));
-  }, [base]);
+    return brands.filter((b) => base.some((p) => productMatchesBrand(p, b)));
+  }, [base, brands]);
 
   const availableCategories = useMemo(() => {
     if (slug !== "all") return [];
-    const ids = new Set(allProducts.map((p) => p.category));
-    return categories.filter((c) => ids.has(c.id));
-  }, [slug]);
+    return categories.filter((c) => allProducts.some((p) => productMatchesCategory(p, c)));
+  }, [slug, allProducts, categories]);
 
-  const maxProductPrice = useMemo(() => Math.max(...base.map((p) => p.price), 500), [base]);
+  const maxProductPrice = useMemo(() => Math.max(...base.map((p) => Number(p.price) || 0), 500), [base]);
 
   const filteredBrands = useMemo(() =>
     availableBrands.filter((b) =>
@@ -104,22 +155,35 @@ export default function CategoryPage({ params }) {
 
   const filtered = useMemo(() => {
     let list = base.filter((p) => {
-      if (p.price < priceRange[0] || p.price > priceRange[1]) return false;
-      if (selectedBrands.length && !selectedBrands.includes(p.brandId)) return false;
-      if (selectedCategories.length && !selectedCategories.includes(p.category)) return false;
-      if (minRating && p.rating < minRating) return false;
-      if (minDiscount && (p.discount || 0) < minDiscount) return false;
-      if (inStockOnly && p.stock <= 0) return false;
+      const price = Number(p.price) || 0;
+      if (price < priceRange[0] || price > priceRange[1]) return false;
+      if (selectedBrands.length) {
+        const matchesAnyBrand = selectedBrands.some((sbId) => {
+          const bObj = brands.find((b) => b.id === sbId || b.slug === sbId);
+          return bObj ? productMatchesBrand(p, bObj) : (p.brandId === sbId || p.brandRefId === sbId);
+        });
+        if (!matchesAnyBrand) return false;
+      }
+      if (selectedCategories.length) {
+        const matchesAnyCat = selectedCategories.some((scId) => {
+          const cObj = categories.find((c) => c.id === scId || c.slug === scId);
+          return cObj ? productMatchesCategory(p, cObj) : (p.categoryId === scId || p.category === scId);
+        });
+        if (!matchesAnyCat) return false;
+      }
+      if (minRating && (Number(p.rating) || 0) < minRating) return false;
+      if (minDiscount && (Number(p.discount) || 0) < minDiscount) return false;
+      if (inStockOnly && (Number(p.stock) || 0) <= 0) return false;
       return true;
     });
 
-    if (sort === "price-low") list = [...list].sort((a, b) => a.price - b.price);
-    else if (sort === "price-high") list = [...list].sort((a, b) => b.price - a.price);
-    else if (sort === "rating") list = [...list].sort((a, b) => b.rating - a.rating);
-    else if (sort === "discount") list = [...list].sort((a, b) => (b.discount || 0) - (a.discount || 0));
+    if (sort === "price-low") list = [...list].sort((a, b) => Number(a.price) - Number(b.price));
+    else if (sort === "price-high") list = [...list].sort((a, b) => Number(b.price) - Number(a.price));
+    else if (sort === "rating") list = [...list].sort((a, b) => Number(b.rating) - Number(a.rating));
+    else if (sort === "discount") list = [...list].sort((a, b) => (Number(b.discount) || 0) - (Number(a.discount) || 0));
     else if (sort === "newest") list = [...list].reverse();
     return list;
-  }, [base, selectedBrands, selectedCategories, priceRange, minRating, minDiscount, inStockOnly, sort]);
+  }, [base, brands, categories, selectedBrands, selectedCategories, priceRange, minRating, minDiscount, inStockOnly, sort]);
 
   function toggleBrand(id) {
     setSelectedBrands((prev) => prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]);
@@ -235,12 +299,22 @@ export default function CategoryPage({ params }) {
                   onChange={() => toggleBrand(b.id)}
                   className="rounded border-slate-300 text-[#0c2340] focus:ring-0 cursor-pointer"
                 />
+                {b.image ? (
+                  <img
+                    src={b.image}
+                    alt={b.name}
+                    className="w-4 h-4 rounded-full object-cover border border-slate-200 shrink-0"
+                    onError={(e) => {
+                      e.target.style.display = "none";
+                    }}
+                  />
+                ) : null}
                 <span className={selectedBrands.includes(b.id) ? "font-bold text-[#0c2340]" : ""}>
                   {b.name}
                 </span>
               </div>
               <span className="text-[10px] text-slate-400 font-medium">
-                ({base.filter((p) => p.brandId === b.id).length})
+                ({base.filter((p) => productMatchesBrand(p, b)).length})
               </span>
             </label>
           ))}
@@ -252,7 +326,8 @@ export default function CategoryPage({ params }) {
         <FilterSection title="Category" defaultOpen={false}>
           <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
             {availableCategories.map((c) => {
-              const Icon = categoryIconMap[c.id] || Tag;
+              const catSlug = c.slug || c.id;
+              const Icon = categoryIconMap[catSlug] || Tag;
               return (
                 <label
                   key={c.id}
@@ -265,13 +340,24 @@ export default function CategoryPage({ params }) {
                       onChange={() => toggleCategory(c.id)}
                       className="rounded border-slate-300 text-[#0c2340] cursor-pointer"
                     />
-                    <Icon size={12} className="text-[#c59b27]" />
+                    {c.image ? (
+                      <img
+                        src={c.image}
+                        alt={c.name}
+                        className="w-4 h-4 rounded object-cover border border-slate-200 shrink-0"
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                          if (e.target.nextSibling) e.target.nextSibling.style.display = "inline";
+                        }}
+                      />
+                    ) : null}
+                    <Icon size={12} className={`text-[#c59b27] ${c.image ? "hidden" : "inline"}`} />
                     <span className={selectedCategories.includes(c.id) ? "font-bold text-[#0c2340]" : ""}>
                       {c.name}
                     </span>
                   </div>
                   <span className="text-[10px] text-slate-400">
-                    ({allProducts.filter((p) => p.category === c.id).length})
+                    ({allProducts.filter((p) => productMatchesCategory(p, c)).length})
                   </span>
                 </label>
               );
@@ -335,6 +421,17 @@ export default function CategoryPage({ params }) {
       </div>
     </div>
   );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center py-20">
+        <div className="flex flex-col items-center gap-3 text-slate-500">
+          <Loader2 size={36} className="animate-spin text-[#0c2340]" />
+          <p className="text-sm font-medium">Loading products…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f8fafc] py-5">
@@ -514,7 +611,11 @@ export default function CategoryPage({ params }) {
               /* List View Mode */
               <div className="space-y-3">
                 {filtered.map((p) => {
-                  const Icon = categoryIconMap[p.category] || Tag;
+                  const catSlug = typeof p.category === "string" ? p.category : (p.categoryRef?.slug || p.categoryId || "");
+                  const Icon = categoryIconMap[catSlug] || Tag;
+                  const brandText = typeof p.brand === "string" ? p.brand : (p.brandRef?.name || p.brand?.name || "");
+                  const catText = typeof p.category === "string" ? p.category.replace(/-/g, " ") : (p.categoryRef?.name || p.category?.name || catSlug);
+                  const imgUrl = p.imageUrl || (p.images && p.images[0]);
                   return (
                     <div
                       key={p.id}
@@ -522,14 +623,18 @@ export default function CategoryPage({ params }) {
                     >
                       <div className="flex gap-4 items-center min-w-0">
                         <div
-                          className="w-16 h-16 rounded border border-slate-200 flex items-center justify-center text-white shrink-0 font-bold"
+                          className="w-16 h-16 rounded border border-slate-200 flex items-center justify-center text-white shrink-0 font-bold overflow-hidden bg-slate-100"
                           style={{ backgroundColor: p.color || "#0c2340" }}
                         >
-                          <Icon size={24} />
+                          {imgUrl ? (
+                            <img src={imgUrl} alt={p.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <Icon size={24} />
+                          )}
                         </div>
                         <div className="min-w-0">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            {p.brand} · <span className="capitalize">{p.category.replace(/-/g, " ")}</span>
+                            {brandText} · <span className="capitalize">{catText}</span>
                           </span>
                           <Link href={`/product/${p.id}`} className="block hover:text-[#d32f2f]">
                             <h3 className="text-sm font-bold text-slate-800 truncate">
@@ -538,10 +643,10 @@ export default function CategoryPage({ params }) {
                           </Link>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="bg-green-700 text-white text-[10px] font-bold px-1.5 py-0.2 rounded flex items-center gap-0.5">
-                              {p.rating} <Star size={8} className="fill-white" />
+                              {p.rating || "4.5"} <Star size={8} className="fill-white" />
                             </span>
                             <span className="text-[11px] text-slate-400">
-                              ({p.reviews} ratings)
+                              ({p.reviews || 0} ratings)
                             </span>
                           </div>
                         </div>
@@ -550,11 +655,11 @@ export default function CategoryPage({ params }) {
                       <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-3 shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                         <div className="text-left sm:text-right">
                           <span className="text-base font-extrabold text-[#0c2340]">
-                            ₹{p.price.toLocaleString()}
+                            ₹{Number(p.price).toLocaleString()}
                           </span>
                           {p.mrp > p.price && (
                             <span className="block text-[11px] text-slate-400 line-through">
-                              MRP ₹{p.mrp.toLocaleString()} ({p.discount}% off)
+                              MRP ₹{Number(p.mrp).toLocaleString()} ({p.discount}% off)
                             </span>
                           )}
                         </div>

@@ -1,7 +1,11 @@
-import Link from "next/link";
-import { ArrowRight, Tag, Package, Percent, Store, FileText } from "lucide-react";
+"use client";
 
-const deals = [
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowRight, Tag, Package, Percent, Store, Sparkles } from "lucide-react";
+import { api } from "@/lib/api";
+
+const defaultDeals = [
   {
     tag: "SPECIAL WHOLESALE TIER",
     title: "Volume Buying Slabs\nFor Boutiques & Retailers",
@@ -41,6 +45,55 @@ const deals = [
 ];
 
 export default function DealBanners() {
+  const [deals, setDeals] = useState(defaultDeals);
+
+  useEffect(() => {
+    let isMounted = true;
+    api.offers
+      .getAll({ isActive: "true" })
+      .then((res) => {
+        const list = Array.isArray(res) ? res : (res?.data || []);
+        if (isMounted && list.length > 0) {
+          const dynamicDeals = list.slice(0, 3).map((offer, index) => {
+            const isDark = index === 0;
+            const targetUrl =
+              offer.targetType === "CATEGORY" && offer.targetName
+                ? `/category/${offer.targetName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+                : offer.targetType === "BRAND" && offer.targetName
+                ? `/brands/${offer.targetName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+                : "/offers";
+
+            return {
+              tag: offer.badgeText || (offer.discountValue ? `UP TO ${offer.discountValue}% OFF` : "PROMOTIONAL OFFER"),
+              title: offer.title,
+              desc: offer.description || "Exclusive direct-mill promotion available for a limited time.",
+              cta: offer.targetName ? `Shop ${offer.targetName}` : "Explore Offer",
+              href: targetUrl,
+              bg: isDark ? "#0c2340" : "#ffffff",
+              textColor: isDark ? "text-white" : "text-slate-800",
+              borderColor: isDark ? "border-slate-700" : "border-slate-200",
+              accent: isDark ? "text-[#c59b27]" : "text-[#d32f2f]",
+              icon: isDark ? Sparkles : Percent,
+            };
+          });
+
+          // Combine dynamic offers with wholesale/dealer programs if less than 3
+          const combined = [...dynamicDeals];
+          defaultDeals.forEach((d) => {
+            if (combined.length < 3) combined.push(d);
+          });
+          setDeals(combined);
+        }
+      })
+      .catch(() => {
+        // Fallback to default deals
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <section className="py-8 sm:py-10 bg-white border-b border-slate-200">
       <div className="container-x">
@@ -48,12 +101,18 @@ export default function DealBanners() {
           <div>
             <span className="section-tag">Value Commercial Programs</span>
             <h2 className="section-title">
-              Commercial & Wholesale Offers
+              Commercial &amp; Promotional Deals
             </h2>
             <p className="section-desc">
               Tailored discount structures for both individual households and high-volume business buyers.
             </p>
           </div>
+          <Link
+            href="/offers"
+            className="text-xs font-bold text-[#0c2340] hover:text-[#d32f2f] flex items-center gap-1 transition-colors self-start sm:self-auto shrink-0"
+          >
+            View All Active Offers →
+          </Link>
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

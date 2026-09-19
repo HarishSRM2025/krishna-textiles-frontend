@@ -1,158 +1,95 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, FreeMode } from "swiper/modules";
 import "swiper/css";
-import brands from "@/data/brands.json";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Award, Sparkles } from "lucide-react";
+import { api } from "@/lib/api";
 
-// Crisp Authentic Visual Brand Logos (Image-Only, No Text Labels)
-function BrandLogoGraphic({ id, name }) {
-  switch (id) {
-    case "jockey":
-      return (
-        <svg viewBox="0 0 160 50" className="h-8 w-auto fill-current text-[#0c2340]">
-          <path d="M15 10c-3.3 0-6 2.7-6 6v14c0 3.3 2.7 6 6 6s6-2.7 6-6V16c0-3.3-2.7-6-6-6zm0 20c-1.1 0-2-.9-2-2V16c0-1.1.9-2 2-2s2 .9 2 2v12c0 1.1-.9 2-2 2z" fill="#d32f2f"/>
-          <text x="32" y="32" fontFamily="Arial Black, Impact, sans-serif" fontSize="22" fontWeight="900" letterSpacing="1.5" fill="#0c2340">
-            JOCKEY
-          </text>
-        </svg>
-      );
-    case "rupa":
-      return (
-        <svg viewBox="0 0 140 50" className="h-8 w-auto">
-          <circle cx="20" cy="25" r="14" fill="#d32f2f" />
-          <path d="M14 20 L26 20 L20 31 Z" fill="#ffffff" />
-          <text x="42" y="33" fontFamily="Arial, Helvetica, sans-serif" fontSize="24" fontWeight="900" fontStyle="italic" fill="#d32f2f">
-            RUPA
-          </text>
-        </svg>
-      );
-    case "vip":
-      return (
-        <svg viewBox="0 0 120 50" className="h-8 w-auto">
-          <rect x="6" y="8" width="108" height="34" rx="6" fill="#1e3a8a" />
-          <text x="60" y="33" textAnchor="middle" fontFamily="Arial Black, Impact, sans-serif" fontSize="22" fontWeight="900" letterSpacing="3" fill="#ffffff">
-            V.I.P
-          </text>
-        </svg>
-      );
-    case "dollar":
-      return (
-        <svg viewBox="0 0 150 50" className="h-8 w-auto">
-          <circle cx="20" cy="25" r="15" fill="#eab308" />
-          <text x="20" y="32" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="20" fontWeight="900" fill="#0c2340">
-            $
-          </text>
-          <text x="45" y="33" fontFamily="Arial Black, sans-serif" fontSize="22" fontWeight="900" letterSpacing="1" fill="#0c2340">
-            DOLLAR
-          </text>
-        </svg>
-      );
-    case "luxcozi":
-      return (
-        <svg viewBox="0 0 160 50" className="h-8 w-auto">
-          <path d="M12 14 L18 8 L24 14 L30 8 L36 14 L36 34 L12 34 Z" fill="#b91c1c" />
-          <text x="44" y="27" fontFamily="Georgia, serif" fontSize="19" fontWeight="900" fill="#b91c1c">
-            LUX
-          </text>
-          <text x="90" y="27" fontFamily="Arial, sans-serif" fontSize="16" fontWeight="800" fontStyle="italic" fill="#c59b27">
-            COZI
-          </text>
-        </svg>
-      );
-    case "vimal":
-      return (
-        <svg viewBox="0 0 140 50" className="h-8 w-auto">
-          <polygon points="20,10 32,25 20,40 8,25" fill="#dc2626" />
-          <text x="42" y="32" fontFamily="Arial Black, sans-serif" fontSize="20" fontWeight="900" letterSpacing="2" fill="#1e293b">
-            VIMAL
-          </text>
-        </svg>
-      );
-    case "enamor":
-      return (
-        <svg viewBox="0 0 150 50" className="h-8 w-auto">
-          <text x="75" y="32" textAnchor="middle" fontFamily="Didot, Bodoni MT, Georgia, serif" fontSize="24" fontWeight="600" letterSpacing="4" fill="#be185d">
-            enamor
-          </text>
-        </svg>
-      );
-    case "macroman":
-      return (
-        <svg viewBox="0 0 170 50" className="h-8 w-auto">
-          <path d="M10 34 L10 12 L18 24 L26 12 L26 34" stroke="#0f172a" strokeWidth="4" fill="none" strokeLinecap="round"/>
-          <text x="36" y="32" fontFamily="Impact, Arial Black, sans-serif" fontSize="21" letterSpacing="1.5" fill="#0f172a">
-            MACROMAN
-          </text>
-        </svg>
-      );
-    case "trylo":
-      return (
-        <svg viewBox="0 0 130 50" className="h-8 w-auto">
-          <text x="65" y="33" textAnchor="middle" fontFamily="Arial Black, sans-serif" fontSize="22" fontWeight="900" fontStyle="italic" letterSpacing="1" fill="#7c3aed">
-            TRYLO
-          </text>
-        </svg>
-      );
-    case "siyarams":
-      return (
-        <svg viewBox="0 0 160 50" className="h-8 w-auto">
-          <path d="M80 6 L86 16 L74 16 Z" fill="#c59b27" />
-          <text x="80" y="34" textAnchor="middle" fontFamily="Times New Roman, serif" fontSize="22" fontWeight="bold" letterSpacing="1" fill="#0c2340">
-            Siyaram&apos;s
-          </text>
-        </svg>
-      );
-    default:
-      return (
-        <div className="h-8 px-4 bg-slate-100 rounded flex items-center justify-center font-extrabold text-xs tracking-wider text-[#0c2340]">
-          {name.toUpperCase()}
-        </div>
-      );
-  }
-}
+const defaultBrands = [
+  { id: "krishna-heritage-silk", slug: "krishna-heritage-silk", name: "Krishna Heritage Silk", image: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=300&auto=format&fit=crop" },
+  { id: "varnam-handlooms", slug: "varnam-handlooms", name: "Varnam Handlooms", image: "https://images.unsplash.com/photo-1509631179647-0177331693ae?w=300&auto=format&fit=crop" },
+  { id: "aura-linen", slug: "aura-linen", name: "Aura Linen & Cottons", image: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=300&auto=format&fit=crop" },
+  { id: "ananya-festive", slug: "ananya-festive", name: "Ananya Festive Weaves", image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=300&auto=format&fit=crop" },
+];
 
 export default function BrandStrip() {
+  const [brands, setBrands] = useState(defaultBrands);
+
+  useEffect(() => {
+    let isMounted = true;
+    api.brands
+      .getAll()
+      .then((res) => {
+        const list = Array.isArray(res) ? res : (res?.data || []);
+        if (isMounted && list.length > 0) {
+          setBrands(list);
+        }
+      })
+      .catch((err) => {
+        console.warn("BrandStrip: Using fallback brands", err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const slideBrands = brands.length > 0 ? [...brands, ...brands, ...brands] : defaultBrands;
+
   return (
-    <section className="bg-white py-6 sm:py-8 border-b border-slate-200">
+    <section className="bg-white py-4 border-b border-slate-200">
       <div className="container-x">
-        {/* Section Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 mb-5">
-          <div>
-            <span className="section-tag">Direct Mill Partnerships</span>
-            <h2 className="section-title">Trusted Indian Textile Brands</h2>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-600 animate-pulse" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Direct Mill Partner Brands
+            </span>
           </div>
           <Link
             href="/brands"
-            className="text-xs font-bold text-[#0c2340] hover:text-[#d32f2f] flex items-center gap-1 transition-colors self-start sm:self-auto shrink-0"
+            className="text-xs font-bold text-[#0c2340] hover:text-[#d32f2f] flex items-center gap-1 transition-colors"
           >
             View All Brands <ChevronRight size={14} />
           </Link>
         </div>
 
-        {/* Continuous Auto-Sliding Swiper Ribbon — Image / Logo Only (No Text) */}
+        {/* Continuous Auto-Sliding Swiper Ribbon */}
         <div className="-mx-3 sm:mx-0">
           <Swiper
             modules={[Autoplay, FreeMode]}
             slidesPerView="auto"
-            spaceBetween={16}
-            loop={true}
+            spaceBetween={14}
+            loop={slideBrands.length > 2}
             freeMode={true}
             autoplay={{ delay: 0, disableOnInteraction: false, pauseOnMouseEnter: true }}
-            speed={4000}
-            className="brand-ribbon-swiper py-2"
+            speed={4500}
+            className="brand-ribbon-swiper py-1"
           >
-            {[...brands, ...brands].map((b, i) => (
-              <SwiperSlide key={`${b.id}-${i}`} style={{ width: "auto" }}>
+            {slideBrands.map((b, i) => (
+              <SwiperSlide key={`${b.id || b.slug}-${i}`} style={{ width: "auto" }}>
                 <Link
-                  href={`/brands/${b.id}`}
-                  className="flex items-center justify-center px-6 py-3.5 rounded bg-slate-50 hover:bg-white border border-slate-200 hover:border-[#0c2340] hover:shadow-md transition-all group min-w-[140px] sm:min-w-[160px] h-14"
+                  href={`/brands/${b.slug || b.id}`}
+                  className="flex items-center justify-center px-3 py-2 rounded-lg bg-slate-50 hover:bg-white border border-slate-200 hover:border-[#0c2340] hover:shadow-md transition-all group h-14 w-32 sm:w-36"
                   title={b.name}
                   aria-label={b.name}
                 >
-                  <BrandLogoGraphic id={b.id} name={b.name} />
+                  {b.image ? (
+                    <img
+                      src={b.image}
+                      alt={b.name}
+                      className="max-h-10 max-w-full object-contain rounded group-hover:scale-105 transition-transform"
+                      onError={(e) => {
+                        e.target.style.display = "none";
+                        if (e.target.nextSibling) e.target.nextSibling.style.display = "inline";
+                      }}
+                    />
+                  ) : null}
+                  <span className={`text-xs font-bold text-slate-700 ${b.image ? "hidden" : "inline"}`}>
+                    {b.name}
+                  </span>
                 </Link>
               </SwiperSlide>
             ))}

@@ -1,29 +1,32 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import products from "@/data/products.json";
+import { api } from "@/lib/api";
 import ProductCard from "@/components/ProductCard";
-import { SearchX, ChevronRight, Search } from "lucide-react";
+import { SearchX, ChevronRight, Loader2 } from "lucide-react";
 
 function SearchResults() {
   const params = useSearchParams();
-  const q = (params.get("q") || "").toLowerCase().trim();
+  const q = (params.get("q") || "").trim();
   const categoryFilter = params.get("category");
 
-  let results = q
-    ? products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.brand.toLowerCase().includes(q) ||
-          p.category.toLowerCase().includes(q.replace(/\s/g, "-"))
-      )
-    : [];
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  if (categoryFilter && categoryFilter !== "all") {
-    results = results.filter((p) => p.category === categoryFilter);
-  }
+  useEffect(() => {
+    if (!q) { setResults([]); return; }
+    setLoading(true);
+    api.products
+      .getAll({ search: q, ...(categoryFilter && categoryFilter !== "all" ? { category: categoryFilter } : {}) })
+      .then((data) => {
+        const list = Array.isArray(data) ? data : (data.data || []);
+        setResults(list);
+      })
+      .catch(() => setResults([]))
+      .finally(() => setLoading(false));
+  }, [q, categoryFilter]);
 
   return (
     <div className="container-x py-6">
@@ -41,7 +44,7 @@ function SearchResults() {
             Search results for &ldquo;{q}&rdquo;
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Found <strong className="text-slate-800">{results.length}</strong> matching textile items
+            {loading ? "Searching…" : <>Found <strong className="text-slate-800">{results.length}</strong> matching textile items</>}
           </p>
         </div>
         <Link href="/category/all" className="text-xs font-bold text-[#0c2340] hover:text-[#d32f2f]">
@@ -49,7 +52,12 @@ function SearchResults() {
         </Link>
       </div>
 
-      {results.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-20 text-slate-400">
+          <Loader2 size={32} className="animate-spin text-[#0c2340] mr-3" />
+          <span className="text-sm font-medium">Searching products…</span>
+        </div>
+      ) : results.length === 0 ? (
         <div className="bg-white rounded border border-slate-200 p-16 text-center shadow-sm max-w-lg mx-auto">
           <div className="w-14 h-14 rounded bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
             <SearchX size={28} />

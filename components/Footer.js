@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -12,6 +13,7 @@ import {
   RotateCcw,
   Headphones,
 } from "lucide-react";
+import { api } from "@/lib/api";
 
 // Clean, dependable inline SVGs for social icons (zero external chunk dependency)
 function FacebookIcon({ size = 14 }) {
@@ -57,11 +59,11 @@ const footerLinks = {
   ],
   "Customer Care": [
     { label: "Track Your Order", href: "/profile" },
-    { label: "Shipping Policy & Delivery", href: "/contact" },
-    { label: "Returns & Exchanges", href: "/contact" },
-    { label: "Terms & Conditions", href: "/contact" },
-    { label: "Privacy Policy", href: "/contact" },
-    { label: "Frequently Asked Questions", href: "/contact" },
+    { label: "Shipping Policy & Delivery", href: "/page/shipping-policy" },
+    { label: "Returns & Exchanges", href: "/page/returns-policy" },
+    { label: "Terms & Conditions", href: "/page/terms-and-conditions" },
+    { label: "Privacy Policy", href: "/page/terms-and-conditions" },
+    { label: "Contact & Support Desk", href: "/page/contact-us" },
   ],
   "Commercial & Wholesale": [
     { label: "Wholesale Order Enquiry", href: "/wholesale" },
@@ -80,6 +82,39 @@ const footerLinks = {
 };
 
 export default function Footer() {
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    api.categories
+      .getAll()
+      .then((data) => {
+        const list = Array.isArray(data) ? data : (data?.data || []);
+        if (isMounted && list.length > 0) {
+          setCategories(list);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const dynamicCategoryLinks =
+    categories.length > 0
+      ? [
+          ...categories.slice(0, 6).map((c) => ({
+            label: c.name,
+            href: `/category/${c.slug || c.id}`,
+          })),
+          { label: "Browse All Categories", href: "/category/all" },
+        ]
+      : footerLinks["Shop Categories"];
+
+  const resolvedFooterLinks = {
+    ...footerLinks,
+    "Shop Categories": dynamicCategoryLinks,
+  };
   return (
     <footer className="bg-[#08182b] text-slate-300 text-xs border-t border-slate-800">
       {/* 4-Item Quality Assurance Strip */}
@@ -183,7 +218,7 @@ export default function Footer() {
           </div>
 
           {/* 3 Link Columns */}
-          {Object.entries(footerLinks).map(([title, links]) => (
+          {Object.entries(resolvedFooterLinks).map(([title, links]) => (
             <div key={title} className="space-y-2.5">
               <h4 className="font-bold text-white text-xs uppercase tracking-wider border-b border-white/10 pb-1.5">
                 {title}
@@ -210,9 +245,9 @@ export default function Footer() {
         <div className="container-x flex flex-col sm:flex-row items-center justify-between gap-2">
           <p>© {new Date().getFullYear()} Krishna Textiles E-Commerce Ltd. All rights reserved.</p>
           <div className="flex items-center gap-4 text-slate-400">
-            <Link href="/contact" className="hover:text-white">Privacy Policy</Link>
-            <Link href="/contact" className="hover:text-white">Terms of Sale</Link>
-            <Link href="/contact" className="hover:text-white">GST Compliance</Link>
+            <Link href="/page/terms-and-conditions" className="hover:text-white">Privacy Policy</Link>
+            <Link href="/page/terms-and-conditions" className="hover:text-white">Terms of Sale</Link>
+            <Link href="/page/shipping-policy" className="hover:text-white">Shipping & GST</Link>
             <Link href="/wholesale" className="hover:text-white text-[#c59b27] font-semibold">Wholesale Portal</Link>
           </div>
         </div>

@@ -1,14 +1,33 @@
-import products from "@/data/products.json";
+"use client";
+
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 import ProductCard from "@/components/ProductCard";
-import { Tag, Sparkles, Percent, Package, Truck, ChevronRight } from "lucide-react";
+import { Tag, Sparkles, Percent, Package, Truck, ChevronRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 
-export const metadata = { title: "Special Deals & Factory Offers | Krishna Textiles" };
-
 export default function OffersPage() {
-  const deals = [...products]
-    .filter((p) => p.discount > 0)
-    .sort((a, b) => b.discount - a.discount);
+  const [deals, setDeals] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadDeals() {
+      setLoading(true);
+      try {
+        const prodData = await api.products.getAll();
+        const products = Array.isArray(prodData) ? prodData : (prodData.data || []);
+        const discounted = products
+          .filter((p) => (Number(p.discount) || 0) > 0 || (Number(p.mrp) > Number(p.price)))
+          .sort((a, b) => (Number(b.discount) || 0) - (Number(a.discount) || 0));
+        setDeals(discounted.length > 0 ? discounted : products);
+      } catch (err) {
+        console.error("Error loading offers:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadDeals();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] py-6">
@@ -31,7 +50,7 @@ export default function OffersPage() {
                 Seasonal Clearance & Mill Slabs
               </span>
               <h1 className="text-xl sm:text-2xl font-extrabold text-white">
-                Textile Deal Zone — Up to 40% Off
+                Textile Deal Zone — Factory Direct Rates
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
                 Direct manufacturer promotional pricing across innerwear, shirting, sarees, and home textiles.
@@ -93,11 +112,21 @@ export default function OffersPage() {
           <span className="text-xs text-slate-500 font-medium">Sorted by Highest Discount</span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-          {deals.map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="animate-spin text-[#0c2340]" size={36} />
+          </div>
+        ) : deals.length === 0 ? (
+          <div className="bg-white p-12 text-center text-xs text-slate-500 rounded border border-slate-200">
+            No active promotional deals right now. Check back soon!
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+            {deals.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

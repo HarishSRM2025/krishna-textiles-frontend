@@ -21,7 +21,10 @@ export default function ProductCard({ product }) {
 
   const discountPct = product.discount || 0;
   const savings = product.mrp - product.price;
-  const IconComponent = categoryIconMap[product.category] || Tag;
+  const catSlug = typeof product.category === 'string' ? product.category : (product.categoryRef?.slug || product.category?.slug || '');
+  const catDisplayName = typeof product.category === 'string' ? product.category.replace(/-/g, " ") : (product.categoryRef?.name || product.category?.name || '');
+  const brandDisplayName = typeof product.brand === 'string' ? product.brand : (product.brandRef?.name || product.brand?.name || '');
+  const IconComponent = categoryIconMap[catSlug] || Tag;
 
   return (
     <div className="card-product group bg-white border border-slate-200 hover:border-slate-400 rounded transition-all duration-200 flex flex-col h-full shadow-sm hover:shadow-md">
@@ -48,23 +51,39 @@ export default function ProductCard({ product }) {
           />
         </button>
 
-        {/* Visual Box with Category Fabric Pattern & Icon */}
-        <Link href={`/product/${product.id}`} className="block">
-          <div
-            className="h-36 sm:h-44 w-full flex flex-col items-center justify-center p-4 transition-transform duration-300 group-hover:scale-105"
-            style={{
-              background: `linear-gradient(145deg, ${product.color || "#0c2340"}15, ${product.color || "#0c2340"}35)`,
-            }}
-          >
+        {/* Visual Box: Real Product Image or Fabric Pattern */}
+        <Link href={`/product/${product.id}`} className="block relative">
+          <div className="h-40 sm:h-48 w-full overflow-hidden bg-slate-50 flex items-center justify-center">
+            {product.imageUrl || (product.images && product.images[0]) ? (
+              <img
+                src={product.imageUrl || product.images[0]}
+                alt={product.name}
+                className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
+                loading="lazy"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+            ) : null}
             <div
-              className="w-14 h-14 rounded flex items-center justify-center text-white shadow-sm mb-2"
-              style={{ backgroundColor: product.color || "#0c2340" }}
+              className={`w-full h-full flex flex-col items-center justify-center p-4 transition-transform duration-300 group-hover:scale-105 ${
+                product.imageUrl || (product.images && product.images[0]) ? 'hidden' : 'flex'
+              }`}
+              style={{
+                background: `linear-gradient(145deg, ${product.color || "#0c2340"}15, ${product.color || "#0c2340"}35)`,
+              }}
             >
-              <IconComponent size={26} />
+              <div
+                className="w-14 h-14 rounded flex items-center justify-center text-white shadow-sm mb-2"
+                style={{ backgroundColor: product.color || "#0c2340" }}
+              >
+                <IconComponent size={26} />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600 bg-white/80 px-2 py-0.5 rounded border border-slate-200">
+                {brandDisplayName}
+              </span>
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600 bg-white/80 px-2 py-0.5 rounded border border-slate-200">
-              {product.brand}
-            </span>
           </div>
         </Link>
       </div>
@@ -74,9 +93,25 @@ export default function ProductCard({ product }) {
         <div>
           {/* Brand & Category header */}
           <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-            <span>{product.brand}</span>
-            <span className="capitalize text-slate-500 font-medium">
-              {product.category?.replace(/-/g, " ")}
+            <div className="flex items-center">
+              {product.brandRef?.image ? (
+                <img
+                  src={product.brandRef.image}
+                  alt={brandDisplayName}
+                  title={brandDisplayName}
+                  className="h-4 w-auto max-w-[85px] object-contain rounded"
+                  onError={(e) => {
+                    e.target.style.display = "none";
+                    if (e.target.nextSibling) e.target.nextSibling.style.display = "inline";
+                  }}
+                />
+              ) : null}
+              <span className={`truncate ${product.brandRef?.image ? "hidden" : "inline"}`}>
+                {brandDisplayName}
+              </span>
+            </div>
+            <span className="capitalize text-slate-500 font-medium truncate max-w-[45%]">
+              {catDisplayName}
             </span>
           </div>
 

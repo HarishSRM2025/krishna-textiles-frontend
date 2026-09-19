@@ -28,24 +28,44 @@ import {
   MapPin,
   Building2,
 } from "lucide-react";
-import categories from "@/data/categories.json";
-import products from "@/data/products.json";
-import brands from "@/data/brands.json";
 import { useCart } from "./CartContext";
+import { api } from "@/lib/api";
 
-const navCategories = categories.filter((c) => c.nav);
-
-const TRENDING_SEARCHES = [
-  "Cotton Shirts",
-  "Handwoven Silk Sarees",
-  "Jockey Cotton Vests",
-  "Kids Nightwear",
-  "Formal Trousers",
-  "Wholesale Fabric",
+const initialCategories = [
+  { id: "pure-silk-sarees", slug: "pure-silk-sarees", name: "Pure Silk Sarees", image: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=600&auto=format&fit=crop" },
+  { id: "cotton-sarees-dhotis", slug: "cotton-sarees-dhotis", name: "Cotton Sarees & Dhotis", image: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?w=600&auto=format&fit=crop" },
+  { id: "designer-kurtis", slug: "designer-kurtis", name: "Designer Kurtis & Tunics", image: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop" },
+  { id: "mens-ethnic-shirting", slug: "mens-ethnic-shirting", name: "Mens Ethnic & Shirting", image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=600&auto=format&fit=crop" },
+  { id: "home-furnishings", slug: "home-furnishings", name: "Home Furnishings & Bedding", image: "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=600&auto=format&fit=crop" },
+  { id: "dress-materials", slug: "dress-materials", name: "Dress Materials & Suits", image: "https://images.unsplash.com/photo-1607345366928-199ea26cfe3e?w=600&auto=format&fit=crop" },
 ];
 
-// Mapping category IDs to crisp Lucide icons
+const initialBrands = [
+  { id: "krishna-heritage-silk", slug: "krishna-heritage-silk", name: "Krishna Heritage Silk", image: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=300&auto=format&fit=crop" },
+  { id: "varnam-handlooms", slug: "varnam-handlooms", name: "Varnam Handlooms", image: "https://images.unsplash.com/photo-1509631179647-0177331693ae?w=300&auto=format&fit=crop" },
+  { id: "aura-linen", slug: "aura-linen", name: "Aura Linen & Cottons", image: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=300&auto=format&fit=crop" },
+  { id: "ananya-festive", slug: "ananya-festive", name: "Ananya Festive Weaves", image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=300&auto=format&fit=crop" },
+];
+
+const TRENDING_SEARCHES = [
+  "Silk Sarees",
+  "Banarasi Zari",
+  "Pure Linen Shirt",
+  "Sungudi Cotton",
+  "Cotton Bedsheet",
+  "Dress Material",
+];
+
+// Mapping category IDs/slugs to crisp Lucide icons — includes DB category slugs
 export const categoryIconMap = {
+  // Database category slugs
+  "pure-silk-sarees": Scissors,
+  "cotton-sarees-dhotis": Scissors,
+  "designer-kurtis": Sparkles,
+  "mens-ethnic-shirting": Shirt,
+  "home-furnishings": Package,
+  "dress-materials": Layers,
+  // Legacy / other category slugs
   "mens-wear": Shirt,
   "mens-innerwear": Layers,
   "womens-innerwear": Sparkles,
@@ -58,7 +78,6 @@ export const categoryIconMap = {
   "tshirts": Shirt,
   "bottomwear": Tag,
   "dupattas-stoles": Sparkles,
-  "dress-materials": Layers,
   "socks": Package,
   "home-textiles": Package,
 };
@@ -68,6 +87,10 @@ export default function Header() {
   const pathname = usePathname();
   const { count, openCart } = useCart();
 
+  const [categories, setCategories] = useState(initialCategories);
+  const [brands, setBrands] = useState(initialBrands);
+  const [products, setProducts] = useState([]);
+
   const [query, setQuery] = useState("");
   const [selectedCat, setSelectedCat] = useState("all");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -75,6 +98,28 @@ export default function Header() {
 
   const searchContainerRef = useRef(null);
   const mobileSearchContainerRef = useRef(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    Promise.all([
+      api.categories.getAll().catch(() => []),
+      api.brands.getAll().catch(() => []),
+      api.products.getAll({ limit: 50 }).catch(() => ({ data: [] })),
+    ]).then(([catRes, brandRes, prodRes]) => {
+      if (!isMounted) return;
+      const cats = Array.isArray(catRes) ? catRes : (catRes?.data || []);
+      const brnds = Array.isArray(brandRes) ? brandRes : (brandRes?.data || []);
+      const prods = Array.isArray(prodRes) ? prodRes : (prodRes?.data || []);
+      if (cats.length > 0) setCategories(cats);
+      if (brnds.length > 0) setBrands(brnds);
+      if (prods.length > 0) setProducts(prods);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const navCategories = categories;
 
   // Close search suggestions on click outside
   useEffect(() => {
@@ -111,22 +156,22 @@ export default function Header() {
     ? products
         .filter(
           (p) =>
-            p.name.toLowerCase().includes(trimmedQuery) ||
-            p.brand.toLowerCase().includes(trimmedQuery) ||
-            p.category.toLowerCase().includes(trimmedQuery)
+            p.name?.toLowerCase().includes(trimmedQuery) ||
+            p.brand?.toLowerCase().includes(trimmedQuery) ||
+            p.category?.toLowerCase().includes(trimmedQuery)
         )
         .slice(0, 5)
     : [];
 
   const matchingCategories = trimmedQuery
     ? categories
-        .filter((c) => c.name.toLowerCase().includes(trimmedQuery))
+        .filter((c) => c.name?.toLowerCase().includes(trimmedQuery))
         .slice(0, 3)
     : [];
 
   const matchingBrands = trimmedQuery
     ? brands
-        .filter((b) => b.name.toLowerCase().includes(trimmedQuery))
+        .filter((b) => b.name?.toLowerCase().includes(trimmedQuery))
         .slice(0, 3)
     : [];
 
@@ -211,12 +256,28 @@ export default function Header() {
                   <button
                     key={b.id}
                     type="button"
-                    onClick={() => handleSuggestionClick(`/brands/${b.id}`)}
+                    onClick={() => handleSuggestionClick(`/brands/${b.slug || b.id}`)}
                     className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 hover:bg-white hover:text-[#0c2340] rounded transition-colors font-medium text-left"
                   >
-                    <span>
-                      brand <strong className="text-[#0c2340]">{b.name}</strong> ({b.tagline})
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {b.image ? (
+                        <img
+                          src={b.image}
+                          alt={b.name}
+                          className="w-5 h-5 rounded-full object-cover border border-slate-200 shrink-0"
+                          onError={(e) => {
+                            e.target.style.display = "none";
+                            if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
+                          }}
+                        />
+                      ) : null}
+                      <span className={`w-5 h-5 rounded-full bg-[#0c2340] text-[#c59b27] text-[9px] font-serif font-black items-center justify-center shrink-0 ${b.image ? "hidden" : "flex"}`}>
+                        {b.name?.[0]}
+                      </span>
+                      <span>
+                        brand <strong className="text-[#0c2340]">{b.name}</strong>
+                      </span>
+                    </div>
                     <ChevronRight size={12} className="text-slate-400" />
                   </button>
                 ))}
@@ -247,7 +308,7 @@ export default function Header() {
                         {p.name}
                       </p>
                       <p className="text-[10px] text-slate-400">
-                        {p.brand} · <span className="text-slate-600 font-medium capitalize">{p.category.replace(/-/g, " ")}</span>
+                        {p.brand} · <span className="text-slate-600 font-medium capitalize">{(typeof p.category === 'string' ? p.category : p.categoryRef?.name || p.categoryRef?.slug || '').replace(/-/g, " ")}</span>
                       </p>
                     </div>
                     <div className="text-right shrink-0">
@@ -327,8 +388,8 @@ export default function Header() {
                   className="text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border-r border-slate-300 px-3 py-2.5 outline-none cursor-pointer hidden lg:block"
                 >
                   <option value="all">All Categories</option>
-                  {navCategories.map((c) => (
-                    <option key={c.id} value={c.id}>
+                  {categories.map((c) => (
+                    <option key={c.id || c.slug} value={c.slug || c.id}>
                       {c.name}
                     </option>
                   ))}
@@ -528,18 +589,30 @@ export default function Header() {
                 All Products
               </Link>
 
-              {navCategories.map((c) => {
-                const IconComponent = categoryIconMap[c.id] || Tag;
+              {categories.map((c) => {
+                const catSlug = c.slug || c.id;
+                const IconComponent = categoryIconMap[catSlug] || categoryIconMap[c.id] || Tag;
                 return (
                   <Link
-                    key={c.id}
-                    href={`/category/${c.id}`}
+                    key={c.id || c.slug}
+                    href={`/category/${catSlug}`}
                     className={`flex items-center gap-1.5 px-3 py-1 rounded text-slate-300 hover:text-white hover:bg-white/10 transition-colors whitespace-nowrap shrink-0 ${
-                      pathname === `/category/${c.id}` ? "bg-white/15 text-white font-bold" : ""
+                      pathname === `/category/${catSlug}` ? "bg-white/15 text-white font-bold" : ""
                     }`}
                   >
-                    <IconComponent size={13} className="text-[#c59b27]" />
-                    <span>{c.navLabel || c.name}</span>
+                    {c.image ? (
+                      <img
+                        src={c.image}
+                        alt={c.name}
+                        className="w-4 h-4 rounded-full object-cover border border-white/30 shrink-0"
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                          if (e.target.nextSibling) e.target.nextSibling.style.display = "inline";
+                        }}
+                      />
+                    ) : null}
+                    <IconComponent size={13} className={`text-[#c59b27] ${c.image ? "hidden" : "inline"}`} />
+                    <span>{c.name}</span>
                   </Link>
                 );
               })}
@@ -649,16 +722,28 @@ export default function Header() {
                 </Link>
 
                 {categories.map((c) => {
-                  const IconComponent = categoryIconMap[c.id] || Tag;
+                  const catSlug = c.slug || c.id;
+                  const IconComponent = categoryIconMap[catSlug] || categoryIconMap[c.id] || Tag;
                   return (
                     <Link
-                      key={c.id}
-                      href={`/category/${c.id}`}
+                      key={c.id || c.slug}
+                      href={`/category/${catSlug}`}
                       onClick={() => setMobileMenuOpen(false)}
                       className="flex items-center justify-between px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 rounded"
                     >
                       <div className="flex items-center gap-2.5">
-                        <IconComponent size={14} className="text-[#c59b27]" />
+                        {c.image ? (
+                          <img
+                            src={c.image}
+                            alt={c.name}
+                            className="w-6 h-6 rounded-md object-cover border border-slate-200 shrink-0"
+                            onError={(e) => {
+                              e.target.style.display = "none";
+                              if (e.target.nextSibling) e.target.nextSibling.style.display = "inline";
+                            }}
+                          />
+                        ) : null}
+                        <IconComponent size={14} className={`text-[#c59b27] ${c.image ? "hidden" : "inline"}`} />
                         <span className="font-medium">{c.name}</span>
                       </div>
                       <ChevronRight size={13} className="text-slate-400" />

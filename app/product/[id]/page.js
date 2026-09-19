@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,8 +21,9 @@ import {
   BadgePercent,
   Info,
   Calendar,
+  Loader2,
 } from "lucide-react";
-import products from "@/data/products.json";
+import { api } from "@/lib/api";
 import ProductCard from "@/components/ProductCard";
 import { useCart } from "@/components/CartContext";
 import { categoryIconMap } from "@/components/Header";
@@ -58,40 +59,53 @@ export default function ProductPage({ params }) {
   const { id } = params;
   const router = useRouter();
   const { addToCart } = useCart();
-  const product = products.find((p) => p.id === id);
 
-  const [size, setSize] = useState(product?.sizes?.[0] || "");
+  const [product, setProduct] = useState(null);
+  const [related, setRelated] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  const [size, setSize] = useState("");
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const [pincode, setPincode] = useState("");
   const [pincodeResult, setPincodeResult] = useState(null);
   const [showAllSlabs, setShowAllSlabs] = useState(false);
 
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        const prodData = await api.products.getOne(id);
+        const prod = prodData?.data || prodData;
+        if (!prod || !prod.id) { setNotFound(true); return; }
+        setProduct(prod);
+        setSize(prod.sizes?.[0] || "");
+        // Fetch related products from same category
+        if (prod.categoryId || prod.category?.id) {
+          const categoryId = prod.categoryId || prod.category?.id;
+          const relData = await api.products.getAll({ categoryId, limit: 7 });
+          const relList = Array.isArray(relData) ? relData : (relData.data || []);
+          setRelated(relList.filter((p) => p.id !== prod.id).slice(0, 6));
+        }
+      } catch (e) {
+        console.error("Product page load error:", e);
+        setNotFound(true);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [id]);
+
   const activeSlab = getActiveSlab(qty);
-  const discountedPrice = Math.round(product?.price * (1 - activeSlab.discount / 100));
+  const price = Number(product?.price) || 0;
+  const mrp = Number(product?.mrp) || 0;
+  const discountedPrice = Math.round(price * (1 - activeSlab.discount / 100));
   const totalPrice = discountedPrice * qty;
-
-  const related = useMemo(() => {
-    if (!product) return [];
-    return products
-      .filter((p) => p.category === product.category && p.id !== product.id)
-      .slice(0, 6);
-  }, [product]);
-
-  if (!product) {
-    return (
-      <div className="container-x py-16 text-center">
-        <div className="w-16 h-16 rounded bg-slate-100 flex items-center justify-center text-slate-400 mx-auto mb-3">
-          <Package size={32} />
-        </div>
-        <p className="text-xl font-bold text-[#0c2340] mb-2">Product Not Found</p>
-        <p className="text-xs text-slate-500 mb-6">The requested SKU does not exist or has been discontinued.</p>
-        <Link href="/category/all" className="btn-primary w-fit mx-auto">
-          Browse Active Catalog
-        </Link>
-      </div>
-    );
-  }
+  const savings = mrp - price;
+  const defaultDelivery = getEstimatedDelivery(3, 6);
+  const slabsToShow = showAllSlabs ? QTY_SLABS : QTY_SLABS.slice(0, 4);
 
   function handleAdd() {
     addToCart(product, size, qty, true);
@@ -113,13 +127,37 @@ export default function ProductPage({ params }) {
     }
   }
 
-  const IconComponent = categoryIconMap[product.category] || Tag;
-  const savings = product.mrp - product.price;
+  if (loading) {
+    return (
+      <div className="container-x py-20 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-slate-500">
+          <Loader2 size={36} className="animate-spin text-[#0c2340]" />
+          <p className="text-sm font-medium">Loading product…</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Estimated delivery range (default, no pincode checked)
-  const defaultDelivery = getEstimatedDelivery(3, 6);
+  if (notFound || !product) {
+    return (
+      <div className="container-x py-16 text-center">
+        <div className="w-16 h-16 rounded bg-slate-100 flex items-center justify-center text-slate-400 mx-auto mb-3">
+          <Package size={32} />
+        </div>
+        <p className="text-xl font-bold text-[#0c2340] mb-2">Product Not Found</p>
+        <p className="text-xs text-slate-500 mb-6">The requested SKU does not exist or has been discontinued.</p>
+        <Link href="/category/all" className="btn-primary w-fit mx-auto">
+          Browse Active Catalog
+        </Link>
+      </div>
+    );
+  }
 
-  const slabsToShow = showAllSlabs ? QTY_SLABS : QTY_SLABS.slice(0, 4);
+  const catSlug = typeof product.category === 'string' ? product.category : (product.categoryRef?.slug || product.categoryId || "");
+  const catName = typeof product.category === 'string' ? product.category.replace(/-/g, " ") : (product.categoryRef?.name || product.category?.name || catSlug);
+  const brandName = typeof product.brand === "string" ? product.brand : (product.brandRef?.name || product.brand?.name || "");
+  const mainImage = product.imageUrl || (product.images && product.images[0]) || product.categoryRef?.image;
+  const IconComponent = categoryIconMap[catSlug] || Tag;
 
   return (
     <div className="container-x py-6">
@@ -129,10 +167,14 @@ export default function ProductPage({ params }) {
         <ChevronRight size={12} />
         <Link href="/category/all" className="hover:text-[#0c2340]">Catalog</Link>
         <ChevronRight size={12} />
-        <Link href={`/category/${product.category}`} className="hover:text-[#0c2340] capitalize">
-          {product.category.replace(/-/g, " ")}
-        </Link>
-        <ChevronRight size={12} />
+        {catSlug && (
+          <>
+            <Link href={`/category/${catSlug}`} className="hover:text-[#0c2340] capitalize">
+              {catName}
+            </Link>
+            <ChevronRight size={12} />
+          </>
+        )}
         <span className="text-[#0c2340] font-semibold truncate max-w-[200px] sm:max-w-none">{product.name}</span>
       </div>
 
@@ -140,44 +182,74 @@ export default function ProductPage({ params }) {
       <div className="grid lg:grid-cols-2 gap-8 bg-white p-4 sm:p-6 rounded border border-slate-200 shadow-sm mb-6">
         {/* Product Visual Box */}
         <div className="relative rounded border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center min-h-[320px] sm:min-h-[420px]">
-          {product.discount > 0 && (
-            <span className="badge-discount z-10">{product.discount}% OFF</span>
+          {mainImage ? (
+            <img
+              src={mainImage}
+              alt={product.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <>
+              {product.discount > 0 && (
+                <span className="badge-discount z-10">{product.discount}% OFF</span>
+              )}
+              <div
+                className="w-full h-full p-8 flex flex-col items-center justify-center"
+                style={{
+                  background: `linear-gradient(145deg, ${product.color || "#0c2340"}15, ${product.color || "#0c2340"}35)`,
+                }}
+              >
+                <div
+                  className="w-28 h-28 rounded-md flex items-center justify-center text-white shadow-md mb-4"
+                  style={{ backgroundColor: product.color || "#0c2340" }}
+                >
+                  <IconComponent size={56} />
+                </div>
+                <span className="text-xs font-black uppercase tracking-widest text-[#0c2340] bg-white px-3 py-1 rounded border border-slate-300 shadow-sm">
+                  {brandName ? `${brandName} ORIGINAL` : 'GENUINE TEXTILE'}
+                </span>
+              </div>
+            </>
           )}
-          <div
-            className="w-full h-full p-8 flex flex-col items-center justify-center"
-            style={{
-              background: `linear-gradient(145deg, ${product.color || "#0c2340"}15, ${product.color || "#0c2340"}35)`,
-            }}
-          >
-            <div
-              className="w-28 h-28 rounded-md flex items-center justify-center text-white shadow-md mb-4"
-              style={{ backgroundColor: product.color || "#0c2340" }}
-            >
-              <IconComponent size={56} />
-            </div>
-            <span className="text-xs font-black uppercase tracking-widest text-[#0c2340] bg-white px-3 py-1 rounded border border-slate-300 shadow-sm">
-              {product.brand} ORIGINAL
-            </span>
-          </div>
         </div>
 
         {/* Product Details Column */}
         <div className="flex flex-col gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-bold text-[#c59b27] uppercase tracking-wider">{product.brand}</span>
-              <span className="text-slate-300">·</span>
-              <span className="text-xs font-medium text-slate-500 capitalize">{product.category?.replace(/-/g, " ")}</span>
+            <div className="flex items-center gap-2 mb-1.5">
+              {product.brandRef?.image ? (
+                <img
+                  src={product.brandRef.image}
+                  alt={brandName}
+                  title={brandName}
+                  className="h-6 w-auto max-w-[120px] object-contain rounded border border-slate-200 p-0.5 bg-white shadow-xs"
+                  onError={(e) => {
+                    e.target.style.display = "none";
+                    if (e.target.nextSibling) e.target.nextSibling.style.display = "inline";
+                  }}
+                />
+              ) : null}
+              {brandName ? (
+                <>
+                  <span className={`text-xs font-bold text-[#c59b27] uppercase tracking-wider ${product.brandRef?.image ? "hidden" : "inline"}`}>
+                    {brandName}
+                  </span>
+                  <span className="text-slate-300">·</span>
+                </>
+              ) : null}
+              <span className="text-xs font-medium text-slate-500 capitalize">
+                {catName}
+              </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-[#0c2340] mb-2 leading-tight">{product.name}</h1>
 
             {/* Rating badge */}
             <div className="flex items-center gap-2 mb-4">
               <span className="flex items-center gap-1 bg-green-700 text-white text-xs font-bold px-2 py-0.5 rounded">
-                {product.rating} <Star size={11} className="fill-white" />
+                {product.rating || "4.5"} <Star size={11} className="fill-white" />
               </span>
               <span className="text-xs text-slate-500 font-medium">
-                {product.reviews?.toLocaleString()} Customer Ratings &amp; Reviews
+                {Number(product.reviews || 0).toLocaleString()} Customer Ratings &amp; Reviews
               </span>
             </div>
 
@@ -185,20 +257,20 @@ export default function ProductPage({ params }) {
             <div className="p-3.5 bg-slate-50 border border-slate-200 rounded mb-4">
               <div className="flex items-baseline gap-3 flex-wrap">
                 <span className="text-2xl sm:text-3xl font-black text-[#0c2340]">
-                  ₹{activeSlab.discount > 0 ? discountedPrice.toLocaleString() : product.price?.toLocaleString()}
+                  ₹{activeSlab.discount > 0 ? discountedPrice.toLocaleString() : price.toLocaleString()}
                 </span>
                 {activeSlab.discount > 0 ? (
                   <>
-                    <span className="text-sm text-slate-400 line-through">₹{product.price?.toLocaleString()}</span>
+                    <span className="text-sm text-slate-400 line-through">₹{price.toLocaleString()}</span>
                     <span className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded">
                       {activeSlab.discount}% Bulk Discount Applied
                     </span>
                   </>
                 ) : (
-                  product.mrp > product.price && (
+                  mrp > price && (
                     <>
-                      <span className="text-sm text-slate-400 line-through">₹{product.mrp?.toLocaleString()}</span>
-                      <span className="text-xs font-bold text-green-700">Save ₹{savings?.toLocaleString()} ({product.discount}% OFF)</span>
+                      <span className="text-sm text-slate-400 line-through">₹{mrp.toLocaleString()}</span>
+                      <span className="text-xs font-bold text-green-700">Save ₹{savings.toLocaleString()} ({product.discount}% OFF)</span>
                     </>
                   )
                 )}
@@ -391,8 +463,8 @@ export default function ProductPage({ params }) {
             </thead>
             <tbody>
               {slabsToShow.map((slab, i) => {
-                const slabPrice = Math.round(product.price * (1 - slab.discount / 100));
-                const savingsPerPc = product.price - slabPrice;
+                const slabPrice = Math.round(price * (1 - slab.discount / 100));
+                const savingsPerPc = price - slabPrice;
                 const isActive = activeSlab === slab;
                 return (
                   <tr
@@ -451,10 +523,10 @@ export default function ProductPage({ params }) {
         <div className="mt-4">
           <div className="flex items-center justify-between mb-5">
             <h2 className="section-title">
-              Similar Products in {product.category.replace(/-/g, " ")}
+              Similar Products in {product.category?.name || catSlug.replace(/-/g, " ")}
             </h2>
             <Link
-              href={`/category/${product.category}`}
+              href={`/category/${catSlug}`}
               className="text-xs font-bold text-[#0c2340] hover:text-[#d32f2f] flex items-center gap-1"
             >
               View Category <ChevronRight size={14} />
