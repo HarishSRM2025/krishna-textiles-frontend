@@ -452,6 +452,8 @@ export default function CartPage() {
             <div className="space-y-3">
               {items.map((item) => {
                 const Icon = categoryIconMap[item.category] || Package;
+                const itemStock = Number(item.stock) || 0;
+                const isItemOutOfStock = itemStock > 0 && item.qty > itemStock;
                 return (
                   <div
                     key={item.key}
@@ -474,6 +476,9 @@ export default function CartPage() {
                         <p className="text-xs text-slate-500 mt-0.5">
                           Size: <strong className="text-slate-700">{item.size}</strong>
                         </p>
+                        {itemStock > 0 && itemStock <= 10 && (
+                          <span className="text-[10px] font-bold text-orange-600 mt-0.5 block">Only {itemStock} in stock</span>
+                        )}
                         <div className="flex items-center gap-2 mt-1">
                           <span className="font-extrabold text-sm text-[#0c2340]">
                             ₹{item.price}
@@ -493,8 +498,9 @@ export default function CartPage() {
                         <div className="flex items-center border border-slate-300 rounded overflow-hidden">
                           <button
                             onClick={() => updateQty(item.key, item.qty - 1)}
-                            className="p-1.5 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+                            className="p-1.5 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             aria-label="Decrease quantity"
+                            disabled={item.qty <= 1}
                           >
                             <Minus size={13} />
                           </button>
@@ -503,8 +509,9 @@ export default function CartPage() {
                           </span>
                           <button
                             onClick={() => updateQty(item.key, item.qty + 1)}
-                            className="p-1.5 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer"
+                            className="p-1.5 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             aria-label="Increase quantity"
+                            disabled={itemStock > 0 && item.qty >= itemStock}
                           >
                             <Plus size={13} />
                           </button>

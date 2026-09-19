@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { calculateUnitPrice } from "@/lib/pricing";
 
 const CartContext = createContext(null);
 const STORAGE_KEY = "krishna-textiles-cart";
@@ -26,13 +27,26 @@ export function CartProvider({ children }) {
     }
   }, [items, loaded]);
 
-  function addToCart(product, size, qty = 1, openDrawer = true) {
+  function addToCart(product, size, qty = 1, openDrawer = true, customUnitPrice = null) {
+    const rawCategory = product.category?.slug || product.categoryId || product.category || "";
+    const basePrice = Number(product.price) || 0;
+    const finalUnitPrice =
+      customUnitPrice !== null
+        ? Number(customUnitPrice)
+        : calculateUnitPrice(basePrice, qty, rawCategory);
+
     setItems((prev) => {
       const key = `${product.id}-${size}`;
       const existing = prev.find((i) => i.key === key);
       if (existing) {
+        const newQty = existing.qty + qty;
+        const newPrice = calculateUnitPrice(
+          existing.basePrice || basePrice,
+          newQty,
+          rawCategory
+        );
         return prev.map((i) =>
-          i.key === key ? { ...i, qty: i.qty + qty } : i
+          i.key === key ? { ...i, qty: newQty, price: newPrice } : i
         );
       }
       return [
@@ -42,10 +56,13 @@ export function CartProvider({ children }) {
           id: product.id,
           name: product.name,
           brand: product.brand,
-          price: product.price,
+          basePrice,
+          price: finalUnitPrice,
           mrp: product.mrp,
           color: product.color,
           category: product.category,
+          categorySlug: rawCategory,
+          stock: product.stock,
           size,
           qty,
         },
@@ -61,7 +78,15 @@ export function CartProvider({ children }) {
     setItems((prev) =>
       qty <= 0
         ? prev.filter((i) => i.key !== key)
-        : prev.map((i) => (i.key === key ? { ...i, qty } : i))
+        : prev.map((i) => {
+            if (i.key !== key) return i;
+            const updatedPrice = calculateUnitPrice(
+              i.basePrice || i.price,
+              qty,
+              i.categorySlug || i.category
+            );
+            return { ...i, qty, price: updatedPrice };
+          })
     );
   }
 

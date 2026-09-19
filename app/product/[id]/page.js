@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -22,29 +22,14 @@ import {
   Info,
   Calendar,
   Loader2,
-  Heart,
+  AlertTriangle,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import ProductCard from "@/components/ProductCard";
 import { useCart } from "@/components/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { categoryIconMap } from "@/components/Header";
-
-// Quantity-based pricing slabs
-const QTY_SLABS = [
-  { label: "1 – 50 pcs", min: 1, max: 50, discount: 0, badge: "Retail Price" },
-  { label: "51 – 100 pcs", min: 51, max: 100, discount: 10, badge: "10% OFF" },
-  { label: "101 – 200 pcs", min: 101, max: 200, discount: 20, badge: "20% OFF" },
-  { label: "201 – 300 pcs", min: 201, max: 300, discount: 30, badge: "30% OFF" },
-  { label: "301 – 500 pcs", min: 301, max: 500, discount: 40, badge: "40% OFF" },
-  { label: "501 – 750 pcs", min: 501, max: 750, discount: 50, badge: "50% OFF" },
-  { label: "751 – 999 pcs", min: 751, max: 999, discount: 60, badge: "60% OFF" },
-  { label: "1000+ pcs", min: 1000, max: Infinity, discount: 70, badge: "70% OFF" },
-];
-
-function getActiveSlab(qty) {
-  return QTY_SLABS.find((s) => qty >= s.min && qty <= s.max) || QTY_SLABS[0];
-}
+import { QTY_SLABS, getTierSlab, isCategoryEligibleForBulkDiscount, calculateUnitPrice } from "@/lib/pricing";
 
 function getEstimatedDelivery(daysMin, daysMax) {
   const now = new Date();
@@ -101,22 +86,38 @@ export default function ProductPage({ params }) {
     load();
   }, [id]);
 
-  const activeSlab = getActiveSlab(qty);
   const price = Number(product?.price) || 0;
   const mrp = Number(product?.mrp) || 0;
-  const discountedPrice = Math.round(price * (1 - activeSlab.discount / 100));
+  const stock = Number(product?.stock) || 0;
+
+  // Derive the category identifier for bulk-discount eligibility
+  const catIdentifier =
+    typeof product?.category === "string"
+      ? product.category
+      : product?.categoryRef?.slug || product?.categoryId || "";
+  const isEligibleForBulk = product ? isCategoryEligibleForBulkDiscount(catIdentifier) : false;
+
+  const activeSlab = product ? getTierSlab(qty, catIdentifier) : QTY_SLABS[0];
+  const discountedPrice = product ? calculateUnitPrice(price, qty, catIdentifier) : price;
   const totalPrice = discountedPrice * qty;
   const savings = mrp - price;
   const defaultDelivery = getEstimatedDelivery(3, 6);
   const slabsToShow = showAllSlabs ? QTY_SLABS : QTY_SLABS.slice(0, 4);
 
+  // Stock-derived helpers
+  const isOutOfStock = stock <= 0;
+  const isLowStock = stock > 0 && stock <= 10;
+  const maxQty = stock > 0 ? stock : 0;
+
   function handleAdd() {
+    if (isOutOfStock) return;
     addToCart(product, size, qty, true);
     setAdded(true);
     setTimeout(() => setAdded(false), 1800);
   }
 
   function handleBuyNow() {
+    if (isOutOfStock) return;
     addToCart(product, size, qty, false);
     router.push("/cart");
   }
@@ -256,11 +257,28 @@ export default function ProductPage({ params }) {
               </span>
             </div>
 
+            {/* Stock Badge */}
+            <div className="mb-3">
+              {isOutOfStock ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 px-3 py-1 rounded-full">
+                  <AlertTriangle size={13} /> Out of Stock
+                </span>
+              ) : isLowStock ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-700 bg-orange-50 border border-orange-200 px-3 py-1 rounded-full">
+                  <AlertTriangle size={13} /> Only {stock} pcs left in stock — order soon!
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-3 py-1 rounded-full">
+                  <CheckCircle2 size={13} /> In Stock — {stock} pcs available
+                </span>
+              )}
+            </div>
+
             {/* Price Line */}
             <div className="p-3.5 bg-slate-50 border border-slate-200 rounded mb-4">
               <div className="flex items-baseline gap-3 flex-wrap">
                 <span className="text-2xl sm:text-3xl font-black text-[#0c2340]">
-                  ₹{activeSlab.discount > 0 ? discountedPrice.toLocaleString() : price.toLocaleString()}
+                  ₹{discountedPrice.toLocaleString()}
                 </span>
                 {activeSlab.discount > 0 ? (
                   <>
@@ -323,23 +341,37 @@ export default function ProductPage({ params }) {
                 <div className="flex items-center gap-3 border border-slate-300 rounded bg-white w-fit px-1">
                   <button
                     onClick={() => setQty((q) => Math.max(1, q - 1))}
-                    className="p-1.5 text-slate-600 hover:text-[#d32f2f]"
+                    disabled={isOutOfStock || qty <= 1}
+                    className="p-1.5 text-slate-600 hover:text-[#d32f2f] disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label="Decrease quantity"
                   >
                     <Minus size={14} />
                   </button>
-                  <span className="w-8 text-center text-xs font-bold text-slate-800">{qty}</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={maxQty || 9999}
+                    value={qty}
+                    disabled={isOutOfStock}
+                    onChange={(e) => {
+                      const v = Math.max(1, Math.min(maxQty || 9999, Number(e.target.value) || 1));
+                      setQty(v);
+                    }}
+                    className="w-12 text-center text-xs font-bold text-slate-800 outline-none border-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    aria-label="Quantity"
+                  />
                   <button
-                    onClick={() => setQty((q) => q + 1)}
-                    className="p-1.5 text-slate-600 hover:text-[#d32f2f]"
+                    onClick={() => setQty((q) => Math.min(maxQty || 9999, q + 1))}
+                    disabled={isOutOfStock || (maxQty > 0 && qty >= maxQty)}
+                    className="p-1.5 text-slate-600 hover:text-[#d32f2f] disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label="Increase quantity"
                   >
                     <Plus size={14} />
                   </button>
                 </div>
-                {activeSlab.discount > 0 && (
+                {activeSlab.discount > 0 && isEligibleForBulk && (
                   <span className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded flex items-center gap-1">
-                    <BadgePercent size={13} /> {activeSlab.badge} for {activeSlab.label}
+                    <BadgePercent size={13} /> {activeSlab.badge} applied!
                   </span>
                 )}
               </div>
@@ -349,14 +381,16 @@ export default function ProductPage({ params }) {
             <div className="flex flex-wrap gap-3 mb-5">
               <button
                 onClick={handleAdd}
-                className="btn-red flex-1 sm:flex-none min-w-[160px] py-3 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow"
+                disabled={isOutOfStock}
+                className="btn-red flex-1 sm:flex-none min-w-[160px] py-3 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ShoppingBag size={16} />
-                {added ? "Added to Cart ✓" : "Add to Cart"}
+                {isOutOfStock ? "Out of Stock" : added ? "Added to Cart ✓" : "Add to Cart"}
               </button>
               <button
                 onClick={handleBuyNow}
-                className="btn-primary flex-1 sm:flex-none min-w-[160px] py-3 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow"
+                disabled={isOutOfStock}
+                className="btn-primary flex-1 sm:flex-none min-w-[160px] py-3 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Zap size={16} className="text-[#c59b27]" /> Buy Now
               </button>
@@ -447,78 +481,84 @@ export default function ProductPage({ params }) {
             <h2 className="font-extrabold text-base text-[#0c2340] flex items-center gap-2">
               <BadgePercent size={18} className="text-[#d32f2f]" /> Quantity-Based Pricing
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">Order more, save more — up to 70% off for bulk orders</p>
+            {isEligibleForBulk ? (
+              <p className="text-xs text-slate-500 mt-0.5">Order more, save more — up to 30% off for bulk orders on this product</p>
+            ) : (
+              <p className="text-xs text-slate-500 mt-0.5">Bulk discount pricing is not applicable for this category</p>
+            )}
           </div>
           <span className="text-[11px] bg-green-50 text-green-700 border border-green-200 font-bold px-2.5 py-1 rounded">
             Currently: {activeSlab.label}
           </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr className="bg-[#0c2340] text-white">
-                <th className="text-left px-3 py-2 font-bold rounded-tl">Quantity</th>
-                <th className="text-left px-3 py-2 font-bold">Discount</th>
-                <th className="text-left px-3 py-2 font-bold">Unit Price</th>
-                <th className="text-left px-3 py-2 font-bold rounded-tr">Savings/pc</th>
-              </tr>
-            </thead>
-            <tbody>
-              {slabsToShow.map((slab, i) => {
-                const slabPrice = Math.round(price * (1 - slab.discount / 100));
-                const savingsPerPc = price - slabPrice;
-                const isActive = activeSlab === slab;
-                return (
-                  <tr
-                    key={i}
-                    className={`border-b border-slate-100 transition-colors ${
-                      isActive
-                        ? "bg-amber-50 border-l-4 border-l-[#c59b27] font-bold"
-                        : i % 2 === 0
-                        ? "bg-white hover:bg-slate-50"
-                        : "bg-slate-50 hover:bg-slate-100"
-                    }`}
-                  >
-                    <td className="px-3 py-2 font-semibold text-[#0c2340]">
-                      {slab.label}
-                      {isActive && <span className="ml-2 text-[9px] bg-[#c59b27] text-[#0c2340] font-extrabold px-1.5 py-0.5 rounded-full uppercase">Your Qty</span>}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${
-                        slab.discount === 0
-                          ? "bg-slate-100 text-slate-600"
-                          : slab.discount >= 50
-                          ? "bg-red-100 text-red-700"
-                          : "bg-green-100 text-green-700"
-                      }`}>
-                        {slab.discount === 0 ? "No Discount" : `${slab.discount}% OFF`}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 font-bold text-[#0c2340]">₹{slabPrice}</td>
-                    <td className="px-3 py-2 text-green-700 font-semibold">
-                      {savingsPerPc > 0 ? `₹${savingsPerPc}/pc` : "—"}
-                    </td>
+        {isEligibleForBulk ? (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-[#0c2340] text-white">
+                    <th className="text-left px-3 py-2 font-bold rounded-tl">Quantity</th>
+                    <th className="text-left px-3 py-2 font-bold">Discount</th>
+                    <th className="text-left px-3 py-2 font-bold">Unit Price</th>
+                    <th className="text-left px-3 py-2 font-bold rounded-tr">Savings/pc</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {!showAllSlabs && (
-          <button
-            onClick={() => setShowAllSlabs(true)}
-            className="mt-3 w-full text-xs font-bold text-[#0c2340] hover:text-[#d32f2f] border border-dashed border-slate-300 rounded py-2 transition-colors flex items-center justify-center gap-1"
-          >
-            + Show all bulk pricing slabs (up to 70% off)
-          </button>
+                </thead>
+                <tbody>
+                  {QTY_SLABS.map((slab, i) => {
+                    const slabPrice = Math.round(price * (1 - slab.discount / 100));
+                    const savingsPerPc = price - slabPrice;
+                    const isActive = activeSlab.min === slab.min;
+                    return (
+                      <tr
+                        key={i}
+                        className={`border-b border-slate-100 transition-colors ${
+                          isActive
+                            ? "bg-amber-50 border-l-4 border-l-[#c59b27] font-bold"
+                            : i % 2 === 0
+                            ? "bg-white hover:bg-slate-50"
+                            : "bg-slate-50 hover:bg-slate-100"
+                        }`}
+                      >
+                        <td className="px-3 py-2 font-semibold text-[#0c2340]">
+                          {slab.label}
+                          {isActive && <span className="ml-2 text-[9px] bg-[#c59b27] text-[#0c2340] font-extrabold px-1.5 py-0.5 rounded-full uppercase">Your Qty</span>}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${
+                            slab.discount === 0
+                              ? "bg-slate-100 text-slate-600"
+                              : slab.discount >= 25
+                              ? "bg-red-100 text-red-700"
+                              : "bg-green-100 text-green-700"
+                          }`}>
+                            {slab.discount === 0 ? "Standard Price" : `${slab.discount}% OFF`}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 font-bold text-[#0c2340]">₹{slabPrice}</td>
+                        <td className="px-3 py-2 text-green-700 font-semibold">
+                          {savingsPerPc > 0 ? `₹${savingsPerPc}/pc` : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
+              <Info size={12} className="text-[#c59b27] shrink-0" />
+              Pricing applies per piece. Max 30% discount. GST included. Contact us for custom bulk quotes.
+            </div>
+          </>
+        ) : (
+          <div className="py-4 flex flex-col items-center gap-2 text-slate-500">
+            <BadgePercent size={28} className="text-slate-300" />
+            <p className="text-xs font-medium text-center">
+              Quantity bulk discounts (10–30%) are available exclusively for<br />
+              <span className="font-bold text-[#0c2340]">Pure Silk Sarees, Cotton Sarees &amp; Dhotis</span> and <span className="font-bold text-[#0c2340]">Dress Materials &amp; Unstitched Suits</span>.
+            </p>
+          </div>
         )}
-
-        <div className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
-          <Info size={12} className="text-[#c59b27] shrink-0" />
-          Pricing applies per piece. GST included. Contact us for custom quotes above 1000 pcs.
-        </div>
       </div>
 
       {/* Related Products Grid */}
