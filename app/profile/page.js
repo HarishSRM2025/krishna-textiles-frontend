@@ -20,11 +20,14 @@ import {
   ShoppingBag,
   ArrowRight,
   AlertCircle,
+  Trash2,
+  Check,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { useCart } from "@/components/CartContext";
 import { api } from "@/lib/api";
+import { getSavedAddresses, addSavedAddress, deleteSavedAddress, setDefaultSavedAddress } from "@/lib/addresses";
 
 const statusConfig = {
   DELIVERED: { color: "text-green-700", bg: "bg-green-50 border-green-200", icon: CheckCircle, label: "Delivered" },
@@ -46,7 +49,15 @@ export default function ProfilePage() {
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [addresses, setAddresses] = useState([]);
   const [showAddAddress, setShowAddAddress] = useState(false);
-  const [newAddress, setNewAddress] = useState({ label: "Home", address: "", city: "", state: "Tamil Nadu", pincode: "", phone: "" });
+  const [newAddress, setNewAddress] = useState({
+    label: "Home",
+    name: "",
+    address: "",
+    city: "Erode",
+    state: "Tamil Nadu",
+    pincode: "638001",
+    phone: "",
+  });
 
   // Guard: if unauthenticated, redirect to signin
   useEffect(() => {
@@ -54,6 +65,22 @@ export default function ProfilePage() {
       router.replace("/signin");
     }
   }, [authLoading, isAuthenticated, router]);
+
+  // Load saved addresses for user
+  useEffect(() => {
+    if (user?.id) {
+      setAddresses(getSavedAddresses(user.id));
+    }
+  }, [user]);
+
+  // Synchronize addresses across tabs / checkout
+  useEffect(() => {
+    const handleSync = () => {
+      if (user?.id) setAddresses(getSavedAddresses(user.id));
+    };
+    window.addEventListener("kt_addresses_updated", handleSync);
+    return () => window.removeEventListener("kt_addresses_updated", handleSync);
+  }, [user]);
 
   // Load real orders from DB
   useEffect(() => {
@@ -103,19 +130,34 @@ export default function ProfilePage() {
 
   const handleAddAddress = (e) => {
     e.preventDefault();
-    if (!newAddress.address || !newAddress.city) return;
-    setAddresses((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        ...newAddress,
-        name: user.name,
-        phone: newAddress.phone || user.phone || "+91 98765 43210",
-        isDefault: prev.length === 0,
-      },
-    ]);
-    setNewAddress({ label: "Home", address: "", city: "", state: "Tamil Nadu", pincode: "", phone: "" });
+    if (!newAddress.address.trim() || !newAddress.city.trim() || !newAddress.pincode.trim()) return;
+    const updated = addSavedAddress(user.id, {
+      ...newAddress,
+      name: newAddress.name?.trim() || user.name || "Customer",
+      phone: newAddress.phone?.trim() || user.phone || "",
+      email: user.email || "",
+    });
+    setAddresses(updated);
+    setNewAddress({
+      label: "Home",
+      name: "",
+      address: "",
+      city: "Erode",
+      state: "Tamil Nadu",
+      pincode: "638001",
+      phone: "",
+    });
     setShowAddAddress(false);
+  };
+
+  const handleDeleteAddress = (id) => {
+    const updated = deleteSavedAddress(user.id, id);
+    setAddresses(updated);
+  };
+
+  const handleSetDefaultAddress = (id) => {
+    const updated = setDefaultSavedAddress(user.id, id);
+    setAddresses(updated);
   };
 
   const menuItems = [
@@ -397,7 +439,29 @@ export default function ProfilePage() {
                 {showAddAddress && (
                   <form onSubmit={handleAddAddress} className="mb-6 p-4 border border-slate-300 rounded-lg bg-slate-50 text-xs space-y-3">
                     <h3 className="font-bold text-slate-800">Add New Delivery Address</h3>
-                    <div className="grid sm:grid-cols-2 gap-3">
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Recipient Name *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newAddress.name}
+                          onChange={(e) => setNewAddress({ ...newAddress, name: e.target.value })}
+                          placeholder={user.name || "e.g. Ramesh Kumar"}
+                          className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Contact Phone *</label>
+                        <input
+                          type="tel"
+                          required
+                          value={newAddress.phone}
+                          onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
+                          placeholder={user.phone || "e.g. 9876543210"}
+                          className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
+                        />
+                      </div>
                       <div>
                         <label className="block font-bold text-slate-700 mb-1">Address Label</label>
                         <select
@@ -411,16 +475,6 @@ export default function ProfilePage() {
                           <option value="Warehouse">Warehouse</option>
                         </select>
                       </div>
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1">Contact Phone</label>
-                        <input
-                          type="tel"
-                          value={newAddress.phone}
-                          onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
-                          placeholder={user.phone || "+91 98765 43210"}
-                          className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
-                        />
-                      </div>
                     </div>
                     <div>
                       <label className="block font-bold text-slate-700 mb-1">Street Address *</label>
@@ -429,19 +483,19 @@ export default function ProfilePage() {
                         required
                         value={newAddress.address}
                         onChange={(e) => setNewAddress({ ...newAddress, address: e.target.value })}
-                        placeholder="House / Shop No., Street, Area"
+                        placeholder="House / Flat / Shop No., Street Name, Landmark"
                         className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
                       />
                     </div>
                     <div className="grid sm:grid-cols-3 gap-3">
                       <div>
-                        <label className="block font-bold text-slate-700 mb-1">City *</label>
+                        <label className="block font-bold text-slate-700 mb-1">City / District *</label>
                         <input
                           type="text"
                           required
                           value={newAddress.city}
                           onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
-                          placeholder="e.g. Erode"
+                          placeholder="e.g. Erode / Coimbatore / Tiruppur"
                           className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
                         />
                       </div>
@@ -471,13 +525,13 @@ export default function ProfilePage() {
                       <button
                         type="button"
                         onClick={() => setShowAddAddress(false)}
-                        className="px-3 py-1.5 border border-slate-300 rounded text-slate-600 font-bold"
+                        className="px-3 py-1.5 border border-slate-300 rounded text-slate-600 font-bold hover:bg-slate-100 cursor-pointer"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
-                        className="btn-primary px-4 py-1.5 rounded font-bold"
+                        className="btn-primary px-4 py-1.5 rounded font-bold cursor-pointer"
                       >
                         Save Address
                       </button>
@@ -489,30 +543,47 @@ export default function ProfilePage() {
                   <div className="text-center py-12 border border-dashed border-slate-200 rounded-lg">
                     <MapPin className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                     <p className="text-xs text-slate-500 font-medium">No saved addresses yet</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Click &quot;+ Add Address&quot; above to add your primary shipping address</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Click &quot;+ Add Address&quot; above to save your delivery destinations</p>
                   </div>
                 ) : (
                   <div className="grid sm:grid-cols-2 gap-4">
                     {addresses.map((addr) => (
                       <div
                         key={addr.id}
-                        className={`p-4 rounded border ${
-                          addr.isDefault ? "border-[#0c2340] bg-slate-50/50" : "border-slate-200 bg-white"
-                        } shadow-sm text-xs space-y-2`}
+                        className={`p-4 rounded-lg border ${
+                          addr.isDefault ? "border-[#0c2340] bg-slate-50/70 ring-1 ring-[#0c2340]" : "border-slate-200 bg-white"
+                        } shadow-sm text-xs space-y-2 relative`}
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-bold text-[#0c2340] text-sm">{addr.label}</span>
-                          {addr.isDefault && (
-                            <span className="text-[10px] font-bold bg-[#0c2340] text-white px-2 py-0.2 rounded">
+                          <span className="font-extrabold text-[#0c2340] text-sm flex items-center gap-1.5">
+                            <MapPin size={14} className="text-[#d32f2f]" /> {addr.label}
+                          </span>
+                          {addr.isDefault ? (
+                            <span className="text-[10px] font-bold bg-[#0c2340] text-white px-2 py-0.5 rounded">
                               DEFAULT
                             </span>
+                          ) : (
+                            <button
+                              onClick={() => handleSetDefaultAddress(addr.id)}
+                              className="text-[11px] text-slate-500 hover:text-[#0c2340] underline font-medium cursor-pointer"
+                            >
+                              Set as Default
+                            </button>
                           )}
                         </div>
-                        <p className="font-semibold text-slate-800">{addr.name}</p>
+                        <p className="font-bold text-slate-800 text-sm">{addr.name}</p>
                         <p className="text-slate-600 leading-relaxed">
                           {addr.address}, {addr.city}, {addr.state} - {addr.pincode}
                         </p>
                         <p className="text-slate-500 font-medium">📞 {addr.phone}</p>
+                        <div className="pt-2 border-t border-slate-100 flex justify-end">
+                          <button
+                            onClick={() => handleDeleteAddress(addr.id)}
+                            className="text-red-600 hover:text-red-700 flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
+                          >
+                            <Trash2 size={12} /> Delete
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
