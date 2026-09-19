@@ -15,8 +15,11 @@ import {
   Sparkles,
 } from "lucide-react";
 
+import { useAuth } from "@/context/AuthContext";
+
 export default function SignInPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [emailOrPhone, setEmailOrPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -25,12 +28,12 @@ export default function SignInPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError("");
 
     if (!emailOrPhone.trim()) {
-      setError("Please enter your registered email address or mobile number");
+      setError("Please enter your registered email address");
       return;
     }
 
@@ -40,13 +43,17 @@ export default function SignInPage() {
     }
 
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await login(emailOrPhone.trim().toLowerCase(), password);
       setSuccess(true);
       setTimeout(() => {
         router.push("/profile");
-      }, 900);
-    }, 800);
+      }, 700);
+    } catch (err) {
+      setError(err.message || "Invalid email or password. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

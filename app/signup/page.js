@@ -18,8 +18,11 @@ import {
   MapPin,
 } from "lucide-react";
 
+import { useAuth } from "@/context/AuthContext";
+
 export default function SignUpPage() {
   const router = useRouter();
+  const { register } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -33,7 +36,7 @@ export default function SignUpPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError("");
 
@@ -63,13 +66,22 @@ export default function SignUpPage() {
     }
 
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await register({
+        name: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone.trim(),
+        password,
+      });
       setSuccess(true);
       setTimeout(() => {
         router.push("/profile");
-      }, 1000);
-    }, 900);
+      }, 700);
+    } catch (err) {
+      setError(err.message || "Failed to create account. Please check your details.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

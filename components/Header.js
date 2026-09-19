@@ -27,8 +27,11 @@ import {
   CheckCircle2,
   MapPin,
   Building2,
+  LogOut,
 } from "lucide-react";
 import { useCart } from "./CartContext";
+import { useAuth } from "@/context/AuthContext";
+import { useWishlist } from "@/context/WishlistContext";
 import { api } from "@/lib/api";
 
 const initialCategories = [
@@ -86,6 +89,8 @@ export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const { count, openCart } = useCart();
+  const { user, isAuthenticated, logout } = useAuth();
+  const { count: wishlistCount } = useWishlist();
 
   const [categories, setCategories] = useState(initialCategories);
   const [brands, setBrands] = useState(initialBrands);
@@ -427,90 +432,86 @@ export default function Header() {
               {renderSuggestions()}
             </div>
 
-            {/* Delivering To Location Selector (Right after Search Bar) */}
-            <Link
-              href="/profile"
-              className="hidden lg:flex items-center gap-2 px-2 py-1 text-white hover:bg-white/10 rounded transition-colors shrink-0 leading-tight select-none"
-              title="Set Delivery Location"
-            >
-              <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-[#c59b27] shrink-0">
-                <MapPin size={15} />
-              </div>
-              <div className="text-left">
-                <span className="text-[10px] text-slate-300 block leading-none">
-                  Delivering to
-                </span>
-                <span className="text-xs font-bold text-white flex items-center gap-0.5 mt-0.5 leading-tight">
-                  Set Address <ChevronDown size={11} className="text-slate-300 ml-0.5" />
-                </span>
-              </div>
-            </Link>
+            {/* Delivering To Location Selector (Only when logged in) */}
+            {isAuthenticated && (
+              <Link
+                href="/profile"
+                className="hidden lg:flex items-center gap-2 px-2 py-1 text-white hover:bg-white/10 rounded transition-colors shrink-0 leading-tight select-none"
+                title="Set Delivery Location"
+              >
+                <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-[#c59b27] shrink-0">
+                  <MapPin size={15} />
+                </div>
+                <div className="text-left">
+                  <span className="text-[10px] text-slate-300 block leading-none">
+                    Delivering to
+                  </span>
+                  <span className="text-xs font-bold text-white flex items-center gap-0.5 mt-0.5 leading-tight">
+                    Set Address <ChevronDown size={11} className="text-slate-300 ml-0.5" />
+                  </span>
+                </div>
+              </Link>
+            )}
 
             {/* Right Action Icons */}
             <div className="ml-auto flex items-center gap-1.5 sm:gap-3">
 
-
               {/* User Account / Profile Dropdown */}
-              <div className="relative group">
+              {!isAuthenticated ? (
                 <Link
-                  href="/profile"
-                  className="flex items-center gap-2 px-2.5 py-1.5 text-white hover:bg-white/10 rounded transition-colors"
+                  href="/signin"
+                  className="flex items-center gap-1.5 bg-[#d32f2f] hover:bg-[#b71c1c] text-white px-3.5 py-1.5 rounded text-xs font-extrabold shadow-sm transition-colors cursor-pointer select-none"
                 >
-                  <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-slate-200">
-                    <User size={15} />
-                  </div>
-                  <div className="hidden xl:block text-left leading-tight">
-                    <span className="text-[10px] text-slate-300 block">Welcome</span>
-                    <span className="text-xs font-bold text-white flex items-center">
-                      My Account <ChevronDown size={11} className="ml-0.5 group-hover:rotate-180 transition-transform" />
-                    </span>
-                  </div>
+                  <User size={15} />
+                  <span>Sign In</span>
                 </Link>
-
-                {/* Dropdown Menu on Desktop Hover */}
-                <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-lg shadow-2xl border border-slate-200 py-3 px-3.5 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 text-slate-800">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-2.5">
-                    <div>
-                      <span className="text-xs font-black text-[#0c2340] block">Welcome to KT</span>
-                      <span className="text-[10px] text-slate-500">Access orders &amp; bulk rates</span>
+              ) : (
+                <div className="relative group">
+                  <Link
+                    href="/profile"
+                    className="flex items-center gap-2 px-2.5 py-1.5 text-white hover:bg-white/10 rounded transition-colors select-none"
+                  >
+                    <div className="w-7 h-7 rounded-full bg-[#c59b27] text-[#0c2340] font-black text-xs flex items-center justify-center shadow-sm">
+                      {user?.name ? user.name[0].toUpperCase() : 'U'}
                     </div>
-                    <Link
-                      href="/signin"
-                      className="bg-[#d32f2f] hover:bg-[#b71c1c] text-white text-[11px] font-bold px-3 py-1.5 rounded shadow-sm transition-colors"
-                    >
-                      Sign In
-                    </Link>
-                  </div>
+                    <div className="hidden xl:block text-left leading-tight">
+                      <span className="text-[10px] text-slate-300 block">Hello,</span>
+                      <span className="text-xs font-bold text-white flex items-center">
+                        {user?.name ? user.name.split(' ')[0] : 'Account'} <ChevronDown size={11} className="ml-0.5 group-hover:rotate-180 transition-transform" />
+                      </span>
+                    </div>
+                  </Link>
 
-                  <div className="text-[11px] text-slate-500 mb-3 text-center">
-                    New customer?{" "}
-                    <Link href="/signup" className="text-[#0c2340] font-extrabold hover:underline">
-                      Sign Up Here
-                    </Link>
-                  </div>
+                  {/* Dropdown Menu on Desktop Hover */}
+                  <div className="absolute right-0 top-full mt-1 w-60 bg-white rounded-lg shadow-2xl border border-slate-200 py-3 px-3.5 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 text-slate-800">
+                    <div className="pb-2.5 mb-2 border-b border-slate-100">
+                      <span className="text-xs font-black text-[#0c2340] block truncate">{user?.name}</span>
+                      <span className="text-[10px] text-slate-500 truncate block">{user?.email}</span>
+                    </div>
 
-                  <div className="space-y-1 pt-1 border-t border-slate-100 text-xs font-semibold">
-                    <Link
-                      href="/profile"
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-50 text-slate-700 hover:text-[#0c2340]"
-                    >
-                      <Package size={14} className="text-[#c59b27]" /> My Orders &amp; Tracking
-                    </Link>
-                    <Link
-                      href="/wishlist"
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-50 text-slate-700 hover:text-[#0c2340]"
-                    >
-                      <Heart size={14} className="text-[#d32f2f]" /> Saved Wishlist
-                    </Link>
-                    <Link
-                      href="/wholesale"
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-50 text-slate-700 hover:text-[#0c2340]"
-                    >
-                      <Building2 size={14} className="text-[#0c2340]" /> Wholesale &amp; Bulk Portal
-                    </Link>
+                    <div className="space-y-1 text-xs font-semibold">
+                      <Link
+                        href="/profile"
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-50 text-slate-700 hover:text-[#0c2340]"
+                      >
+                        <Package size={14} className="text-[#c59b27]" /> My Orders &amp; Tracking
+                      </Link>
+                      <Link
+                        href="/wishlist"
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-slate-50 text-slate-700 hover:text-[#0c2340]"
+                      >
+                        <Heart size={14} className="text-[#d32f2f]" /> Saved Wishlist ({wishlistCount})
+                      </Link>
+                      <button
+                        onClick={logout}
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded hover:bg-red-50 text-[#d32f2f] text-left transition-colors cursor-pointer border-t border-slate-100 mt-1.5 pt-2"
+                      >
+                        <LogOut size={14} /> Log Out
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Wishlist Link */}
               <Link
@@ -519,6 +520,11 @@ export default function Header() {
                 aria-label="Wishlist"
               >
                 <Heart size={18} />
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-[#d32f2f] text-white text-[9px] font-extrabold rounded-full w-4 h-4 flex items-center justify-center border border-[#0c2340]">
+                    {wishlistCount}
+                  </span>
+                )}
               </Link>
 
               {/* Cart Button (Opens Offcanvas) */}
@@ -672,38 +678,65 @@ export default function Header() {
 
               {/* User Actions banner */}
               <div className="p-3 bg-slate-50 border-b border-slate-200 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Link
-                    href="/signin"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex-1 bg-[#d32f2f] text-white text-center py-2 rounded text-xs font-bold shadow-sm"
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    href="/signup"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex-1 bg-[#0c2340] text-white text-center py-2 rounded text-xs font-bold shadow-sm"
-                  >
-                    Sign Up
-                  </Link>
-                </div>
-                <div className="flex items-center justify-between pt-1 text-xs font-semibold text-slate-700">
-                  <Link
-                    href="/profile"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-1.5 hover:text-[#d32f2f]"
-                  >
-                    <User size={14} className="text-[#0c2340]" /> My Orders
-                  </Link>
-                  <Link
-                    href="/wishlist"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-1 hover:text-[#d32f2f]"
-                  >
-                    <Heart size={14} className="text-[#d32f2f]" /> Wishlist
-                  </Link>
-                </div>
+                {!isAuthenticated ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href="/signin"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex-1 bg-[#d32f2f] text-white text-center py-2.5 rounded text-xs font-bold shadow-sm"
+                      >
+                        Sign In
+                      </Link>
+                      <Link
+                        href="/signup"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex-1 bg-[#0c2340] text-white text-center py-2.5 rounded text-xs font-bold shadow-sm"
+                      >
+                        Sign Up
+                      </Link>
+                    </div>
+                    <div className="flex items-center justify-center pt-1 text-xs font-semibold text-slate-700">
+                      <Link
+                        href="/wishlist"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-1 hover:text-[#d32f2f]"
+                      >
+                        <Heart size={14} className="text-[#d32f2f]" /> Saved Wishlist ({wishlistCount})
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full bg-[#c59b27] text-[#0c2340] font-black text-xs flex items-center justify-center shadow-sm">
+                        {user?.name ? user.name[0].toUpperCase() : 'U'}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-[#0c2340] truncate">{user?.name}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{user?.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 text-xs font-semibold text-slate-700">
+                      <Link
+                        href="/profile"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-1.5 text-[#0c2340] hover:text-[#d32f2f]"
+                      >
+                        <Package size={14} className="text-[#c59b27]" /> My Orders &amp; Profile
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          logout();
+                        }}
+                        className="text-[#d32f2f] hover:underline cursor-pointer flex items-center gap-1 text-xs font-bold"
+                      >
+                        <LogOut size={13} /> Log Out
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Navigation Links list */}

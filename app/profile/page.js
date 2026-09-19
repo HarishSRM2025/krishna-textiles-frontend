@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   User,
   Package,
@@ -10,94 +11,119 @@ import {
   Settings,
   LogOut,
   ChevronRight,
-  Star,
   Clock,
   CheckCircle,
   Truck,
   Edit3,
   Plus,
-  Bell,
-  Shield,
-  CreditCard,
-  Phone,
-  Mail,
   Shirt,
-  Scissors,
-  Tag,
   ShoppingBag,
+  ArrowRight,
+  AlertCircle,
 } from "lucide-react";
-
-const mockOrders = [
-  {
-    id: "KT2024001",
-    date: "12 Aug 2024",
-    status: "Delivered",
-    items: [
-      { name: "Men's Cotton Vest (Pack of 3)", brand: "Jockey", qty: 1, price: 299, category: "mens-innerwear" }
-    ],
-    total: 299,
-  },
-  {
-    id: "KT2024002",
-    date: "05 Aug 2024",
-    status: "In Transit",
-    items: [
-      { name: "Cotton Formal Shirt", brand: "Siyaram's", qty: 2, price: 799, category: "shirts" },
-      { name: "Slim Fit Denim Jeans", brand: "VIP", qty: 1, price: 1199, category: "bottomwear" },
-    ],
-    total: 2797,
-  },
-  {
-    id: "KT2024003",
-    date: "28 Jul 2024",
-    status: "Processing",
-    items: [
-      { name: "Handwoven Silk Saree", brand: "Siyaram's", qty: 1, price: 2499, category: "sarees" }
-    ],
-    total: 2499,
-  },
-];
-
-const savedAddresses = [
-  {
-    id: 1,
-    label: "Home",
-    name: "Rajesh Kumar",
-    address: "12, Gandhi Nagar, 3rd Street",
-    city: "Erode",
-    state: "Tamil Nadu",
-    pin: "638001",
-    phone: "+91 98765 43210",
-    isDefault: true,
-  },
-  {
-    id: 2,
-    label: "Office / Boutique",
-    name: "Rajesh Kumar",
-    address: "45, Industrial Area, Phase 2",
-    city: "Tiruppur",
-    state: "Tamil Nadu",
-    pin: "641604",
-    phone: "+91 98765 43210",
-    isDefault: false,
-  },
-];
+import { useAuth } from "@/context/AuthContext";
+import { useWishlist } from "@/context/WishlistContext";
+import { useCart } from "@/components/CartContext";
+import { api } from "@/lib/api";
 
 const statusConfig = {
-  Delivered: { color: "text-green-700", bg: "bg-green-50 border-green-200", icon: CheckCircle },
-  "In Transit": { color: "text-blue-700", bg: "bg-blue-50 border-blue-200", icon: Truck },
-  Processing: { color: "text-amber-700", bg: "bg-amber-50 border-amber-200", icon: Clock },
+  DELIVERED: { color: "text-green-700", bg: "bg-green-50 border-green-200", icon: CheckCircle, label: "Delivered" },
+  DISPATCHED: { color: "text-blue-700", bg: "bg-blue-50 border-blue-200", icon: Truck, label: "Dispatched & In Transit" },
+  PROCESSING: { color: "text-purple-700", bg: "bg-purple-50 border-purple-200", icon: Clock, label: "Processing at Mill" },
+  CONFIRMED: { color: "text-amber-700", bg: "bg-amber-50 border-amber-200", icon: Clock, label: "Order Confirmed" },
+  PENDING: { color: "text-amber-700", bg: "bg-amber-50 border-amber-200", icon: Clock, label: "Pending Verification" },
+  CANCELLED: { color: "text-red-700", bg: "bg-red-50 border-red-200", icon: AlertCircle, label: "Cancelled" },
 };
 
-const menuItems = [
-  { label: "My Orders & History", icon: Package, section: "orders", badge: "3" },
-  { label: "Saved Wishlist", icon: Heart, section: "wishlist" },
-  { label: "Delivery Addresses", icon: MapPin, section: "addresses" },
-  { label: "Account Settings", icon: Settings, section: "settings" },
-];
-
 export default function ProfilePage() {
+  const router = useRouter();
+  const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
+  const { wishlist, removeFromWishlist } = useWishlist();
+  const { addItem } = useCart();
+
   const [activeSection, setActiveSection] = useState("orders");
+  const [orders, setOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [addresses, setAddresses] = useState([]);
+  const [showAddAddress, setShowAddAddress] = useState(false);
+  const [newAddress, setNewAddress] = useState({ label: "Home", address: "", city: "", state: "Tamil Nadu", pincode: "", phone: "" });
+
+  // Guard: if unauthenticated, redirect to signin
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.replace("/signin");
+    }
+  }, [authLoading, isAuthenticated, router]);
+
+  // Load real orders from DB
+  useEffect(() => {
+    let isMounted = true;
+    if (user?.email || user?.phone) {
+      setLoadingOrders(true);
+      api.orders
+        .getMyOrders({
+          customerEmail: user?.email,
+          customerPhone: user?.phone,
+          limit: 50,
+        })
+        .then((res) => {
+          if (isMounted) {
+            setOrders(res?.orders || res?.data || []);
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to load customer orders from DB", err);
+        })
+        .finally(() => {
+          if (isMounted) setLoadingOrders(false);
+        });
+    } else if (!authLoading && !user) {
+      setLoadingOrders(false);
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [user, authLoading]);
+
+  // If still checking auth or not authenticated, don't show profile
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f8fafc]">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-[#0c2340] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-xs font-semibold text-slate-500">Checking your account...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !user) {
+    return null;
+  }
+
+  const handleAddAddress = (e) => {
+    e.preventDefault();
+    if (!newAddress.address || !newAddress.city) return;
+    setAddresses((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        ...newAddress,
+        name: user.name,
+        phone: newAddress.phone || user.phone || "+91 98765 43210",
+        isDefault: prev.length === 0,
+      },
+    ]);
+    setNewAddress({ label: "Home", address: "", city: "", state: "Tamil Nadu", pincode: "", phone: "" });
+    setShowAddAddress(false);
+  };
+
+  const menuItems = [
+    { label: "My Orders & History", icon: Package, section: "orders", badge: orders.length > 0 ? String(orders.length) : null },
+    { label: "Saved Wishlist", icon: Heart, section: "wishlist", badge: wishlist.length > 0 ? String(wishlist.length) : null },
+    { label: "Delivery Addresses", icon: MapPin, section: "addresses" },
+    { label: "Account Settings", icon: Settings, section: "settings" },
+  ];
 
   return (
     <div className="min-h-screen bg-[#f8fafc] py-6">
@@ -117,26 +143,22 @@ export default function ProfilePage() {
               <div className="h-16 bg-gradient-to-r from-[#0c2340] to-[#163864]" />
               <div className="px-4 pb-4 text-center -mt-8">
                 <div className="w-16 h-16 rounded bg-[#c59b27] text-[#0c2340] font-black text-xl flex items-center justify-center border-2 border-white shadow-md mx-auto mb-2">
-                  RK
+                  {user.name ? user.name[0].toUpperCase() : "U"}
                 </div>
-                <h3 className="font-extrabold text-sm text-[#0c2340]">Rajesh Kumar</h3>
-                <p className="text-[11px] text-slate-400">Verified Retail Buyer</p>
+                <h3 className="font-extrabold text-sm text-[#0c2340]">{user.name}</h3>
+                <p className="text-[11px] text-slate-500 truncate">{user.email}</p>
                 <span className="inline-block mt-1 text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded">
-                  GST Verified Account
+                  {user.role === "ADMIN" ? "Staff Admin Portal" : "Verified Customer"}
                 </span>
 
-                <div className="grid grid-cols-3 gap-1 mt-3 pt-3 border-t border-slate-100 text-center">
+                <div className="grid grid-cols-2 gap-1 mt-3 pt-3 border-t border-slate-100 text-center">
                   <div>
-                    <span className="text-xs font-black text-[#0c2340] block">3</span>
+                    <span className="text-xs font-black text-[#0c2340] block">{orders.length}</span>
                     <span className="text-[9px] text-slate-400 uppercase font-semibold">Orders</span>
                   </div>
                   <div>
-                    <span className="text-xs font-black text-[#0c2340] block">0</span>
+                    <span className="text-xs font-black text-[#0c2340] block">{wishlist.length}</span>
                     <span className="text-[9px] text-slate-400 uppercase font-semibold">Wishlist</span>
-                  </div>
-                  <div>
-                    <span className="text-xs font-black text-[#0c2340] block">2</span>
-                    <span className="text-[9px] text-slate-400 uppercase font-semibold">Addresses</span>
                   </div>
                 </div>
               </div>
@@ -151,7 +173,7 @@ export default function ProfilePage() {
                   <button
                     key={item.section}
                     onClick={() => setActiveSection(item.section)}
-                    className={`w-full flex items-center justify-between p-3 text-left transition-colors ${
+                    className={`w-full flex items-center justify-between p-3 text-left transition-colors cursor-pointer ${
                       isActive
                         ? "bg-slate-100 text-[#0c2340] border-l-4 border-[#0c2340]"
                         : "text-slate-700 hover:bg-slate-50"
@@ -169,7 +191,10 @@ export default function ProfilePage() {
                   </button>
                 );
               })}
-              <button className="w-full flex items-center gap-2.5 p-3 text-left text-[#d32f2f] hover:bg-red-50 transition-colors">
+              <button
+                onClick={logout}
+                className="w-full flex items-center gap-2.5 p-3 text-left text-[#d32f2f] hover:bg-red-50 transition-colors cursor-pointer"
+              >
                 <LogOut size={16} />
                 <span>Log Out</span>
               </button>
@@ -184,75 +209,106 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
                   <div>
                     <h2 className="text-base font-extrabold text-[#0c2340]">Order History</h2>
-                    <p className="text-xs text-slate-400">Track and manage past wholesale & retail orders</p>
+                    <p className="text-xs text-slate-400">All live orders placed by your account from database</p>
                   </div>
                   <Link href="/category/all" className="btn-red text-xs px-3 py-1.5 rounded">
                     + Shop More
                   </Link>
                 </div>
 
-                <div className="space-y-4">
-                  {mockOrders.map((order) => {
-                    const cfg = statusConfig[order.status] || statusConfig.Processing;
-                    const StatusIcon = cfg.icon;
-                    return (
-                      <div key={order.id} className="border border-slate-200 rounded overflow-hidden shadow-sm">
-                        {/* Order Meta Bar */}
-                        <div className="bg-slate-50 p-3 flex flex-wrap items-center justify-between gap-2 text-xs border-b border-slate-200">
-                          <div className="flex items-center gap-3">
-                            <span className="font-bold text-[#0c2340]">#{order.id}</span>
-                            <span className="text-slate-400">·</span>
-                            <span className="text-slate-500 font-medium">Placed on {order.date}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>
-                              <StatusIcon size={12} /> {order.status}
-                            </span>
-                            <span className="font-extrabold text-[#0c2340] text-sm">
-                              ₹{order.total.toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
+                {loadingOrders ? (
+                  <div className="text-center py-16">
+                    <div className="w-8 h-8 border-3 border-[#0c2340] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                    <p className="text-xs text-slate-500">Loading your orders from database...</p>
+                  </div>
+                ) : orders.length === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="w-14 h-14 rounded bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                      <ShoppingBag size={26} />
+                    </div>
+                    <h4 className="font-bold text-slate-800 text-sm mb-1">No orders placed yet</h4>
+                    <p className="text-xs text-slate-500 max-w-xs mx-auto mb-4">
+                      You have not placed any orders yet. Explore our factory-direct catalog to place your first order.
+                    </p>
+                    <Link href="/category/all" className="btn-primary text-xs">
+                      Explore Catalog
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {orders.map((order) => {
+                      const cfg = statusConfig[order.status] || statusConfig.PENDING;
+                      const StatusIcon = cfg.icon;
+                      const formattedDate = order.createdAt
+                        ? new Date(order.createdAt).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })
+                        : "Recent";
 
-                        {/* Order Items */}
-                        <div className="p-3.5 divide-y divide-slate-100">
-                          {order.items.map((item, idx) => (
-                            <div key={idx} className="py-2 first:pt-0 last:pb-0 flex items-center justify-between gap-3 text-xs">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded bg-[#0c2340] text-white flex items-center justify-center font-bold text-xs shrink-0">
-                                  <Shirt size={18} />
-                                </div>
-                                <div>
-                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                                    {item.brand}
-                                  </span>
-                                  <h4 className="font-bold text-slate-800">{item.name}</h4>
-                                  <span className="text-[11px] text-slate-500">Quantity: {item.qty}</span>
-                                </div>
-                              </div>
-                              <span className="font-bold text-slate-800">
-                                ₹{(item.price * item.qty).toLocaleString()}
+                      return (
+                        <div key={order.id} className="border border-slate-200 rounded overflow-hidden shadow-sm">
+                          {/* Order Meta Bar */}
+                          <div className="bg-slate-50 p-3 flex flex-wrap items-center justify-between gap-2 text-xs border-b border-slate-200">
+                            <div className="flex items-center gap-3">
+                              <span className="font-bold text-[#0c2340]">#{order.orderNumber || order.id}</span>
+                              <span className="text-slate-400">·</span>
+                              <span className="text-slate-500 font-medium">Placed on {formattedDate}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded border ${cfg.bg} ${cfg.color}`}>
+                                <StatusIcon size={12} /> {cfg.label}
+                              </span>
+                              <span className="font-extrabold text-[#0c2340] text-sm">
+                                ₹{(order.totalAmount || order.subtotal || 0).toLocaleString()}
                               </span>
                             </div>
-                          ))}
-                        </div>
+                          </div>
 
-                        {/* Action footer */}
-                        <div className="bg-slate-50/70 px-3.5 py-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                          <span className="text-[11px] text-slate-400">Tax Invoice available for download</span>
-                          <div className="flex gap-2">
-                            <button className="px-2.5 py-1 bg-white border border-slate-300 hover:border-slate-500 rounded text-slate-700 font-bold text-[11px]">
-                              Download GST Invoice
-                            </button>
-                            <button className="px-2.5 py-1 bg-[#0c2340] hover:bg-[#123661] text-white rounded font-bold text-[11px]">
-                              Track Dispatch
-                            </button>
+                          {/* Order Items */}
+                          <div className="p-3.5 divide-y divide-slate-100">
+                            {(order.items || []).map((item, idx) => (
+                              <div key={idx} className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3 text-xs">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded bg-[#0c2340] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                                    <Shirt size={18} />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-bold text-slate-800">{item.productName || item.product?.name || "Textile Item"}</h4>
+                                    <span className="text-[11px] text-slate-500">
+                                      Qty: {item.quantity} {item.size ? `· Size: ${item.size}` : ""}
+                                    </span>
+                                  </div>
+                                </div>
+                                <span className="font-bold text-slate-800">
+                                  ₹{((item.unitPrice || 0) * (item.quantity || 1)).toLocaleString()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Action footer */}
+                          <div className="bg-slate-50/70 px-3.5 py-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <div className="text-[11px] text-slate-500">
+                              {order.shippingAddress && (
+                                <span>Shipping to: <strong>{order.shippingAddress}</strong></span>
+                              )}
+                              {order.trackingNumber && (
+                                <span className="ml-3">Tracking: <strong>{order.trackingNumber}</strong> ({order.courierPartner || "Express"})</span>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              <span className="inline-block px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded text-[10px] font-bold">
+                                Payment: {order.paymentStatus || "UNPAID"}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -260,21 +316,65 @@ export default function ProfilePage() {
             {activeSection === "wishlist" && (
               <div>
                 <div className="pb-3 mb-4 border-b border-slate-200">
-                  <h2 className="text-base font-extrabold text-[#0c2340]">Saved Wishlist</h2>
-                  <p className="text-xs text-slate-400">Products you've saved for future procurement</p>
+                  <h2 className="text-base font-extrabold text-[#0c2340]">Saved Wishlist ({wishlist.length})</h2>
+                  <p className="text-xs text-slate-400">Products saved for later procurement</p>
                 </div>
-                <div className="text-center py-16">
-                  <div className="w-14 h-14 rounded bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
-                    <Heart size={26} />
+                {wishlist.length === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="w-14 h-14 rounded bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                      <Heart size={26} />
+                    </div>
+                    <h4 className="font-bold text-slate-800 text-sm mb-1">Your wishlist is currently empty</h4>
+                    <p className="text-xs text-slate-500 max-w-xs mx-auto mb-4">
+                      Click the heart icon on any product in our catalog to save items here.
+                    </p>
+                    <Link href="/category/all" className="btn-primary text-xs">
+                      Explore Product Catalog
+                    </Link>
                   </div>
-                  <h4 className="font-bold text-slate-800 text-sm mb-1">Your wishlist is currently empty</h4>
-                  <p className="text-xs text-slate-500 max-w-xs mx-auto mb-4">
-                    Click the heart icon on any product in our catalog to save items here.
-                  </p>
-                  <Link href="/category/all" className="btn-primary text-xs">
-                    Explore Product Catalog
-                  </Link>
-                </div>
+                ) : (
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {wishlist.map((item) => (
+                      <div key={item.id} className="border border-slate-200 rounded-lg p-3.5 bg-white shadow-sm flex flex-col justify-between">
+                        <div>
+                          <div className="w-full h-36 bg-slate-100 rounded-md mb-2.5 flex items-center justify-center text-slate-400 font-bold overflow-hidden relative">
+                            {item.imageUrl ? (
+                              <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <Shirt size={32} />
+                            )}
+                          </div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{item.brand}</span>
+                          <h4 className="font-bold text-slate-800 text-xs line-clamp-2 mt-0.5">{item.name}</h4>
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="font-extrabold text-sm text-[#0c2340]">₹{item.price}</span>
+                            {item.mrp > item.price && (
+                              <span className="text-xs text-slate-400 line-through">₹{item.mrp}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              addItem(item, 1, true);
+                              removeFromWishlist(item.id);
+                            }}
+                            className="flex-1 bg-[#0c2340] hover:bg-[#153a69] text-white py-1.5 rounded text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            Move to Cart
+                          </button>
+                          <button
+                            onClick={() => removeFromWishlist(item.id)}
+                            className="px-2 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-400 hover:text-red-500 rounded text-xs transition-colors cursor-pointer"
+                            title="Remove"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -286,40 +386,137 @@ export default function ProfilePage() {
                     <h2 className="text-base font-extrabold text-[#0c2340]">Saved Addresses</h2>
                     <p className="text-xs text-slate-400">Manage dispatch & delivery destination locations</p>
                   </div>
-                  <button className="btn-primary text-xs px-3 py-1.5 rounded flex items-center gap-1">
+                  <button
+                    onClick={() => setShowAddAddress(!showAddAddress)}
+                    className="btn-primary text-xs px-3 py-1.5 rounded flex items-center gap-1 cursor-pointer"
+                  >
                     <Plus size={13} /> Add Address
                   </button>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {savedAddresses.map((addr) => (
-                    <div
-                      key={addr.id}
-                      className={`p-4 rounded border ${
-                        addr.isDefault ? "border-[#0c2340] bg-slate-50/50" : "border-slate-200 bg-white"
-                      } shadow-sm text-xs space-y-2`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-[#0c2340] text-sm">{addr.label}</span>
-                        {addr.isDefault && (
-                          <span className="text-[10px] font-bold bg-[#0c2340] text-white px-2 py-0.2 rounded">
-                            PRIMARY DEFAULT
-                          </span>
-                        )}
+                {showAddAddress && (
+                  <form onSubmit={handleAddAddress} className="mb-6 p-4 border border-slate-300 rounded-lg bg-slate-50 text-xs space-y-3">
+                    <h3 className="font-bold text-slate-800">Add New Delivery Address</h3>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Address Label</label>
+                        <select
+                          value={newAddress.label}
+                          onChange={(e) => setNewAddress({ ...newAddress, label: e.target.value })}
+                          className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
+                        >
+                          <option value="Home">Home</option>
+                          <option value="Office">Office</option>
+                          <option value="Shop / Boutique">Shop / Boutique</option>
+                          <option value="Warehouse">Warehouse</option>
+                        </select>
                       </div>
-                      <p className="font-semibold text-slate-800">{addr.name}</p>
-                      <p className="text-slate-600 leading-relaxed">
-                        {addr.address}, {addr.city}, {addr.state} - {addr.pin}
-                      </p>
-                      <p className="text-slate-500 font-medium">📞 {addr.phone}</p>
-                      <div className="pt-2 border-t border-slate-200 flex gap-2">
-                        <button className="text-[11px] font-bold text-[#0c2340] hover:underline flex items-center gap-1">
-                          <Edit3 size={11} /> Edit
-                        </button>
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Contact Phone</label>
+                        <input
+                          type="tel"
+                          value={newAddress.phone}
+                          onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
+                          placeholder={user.phone || "+91 98765 43210"}
+                          className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
+                        />
                       </div>
                     </div>
-                  ))}
-                </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">Street Address *</label>
+                      <input
+                        type="text"
+                        required
+                        value={newAddress.address}
+                        onChange={(e) => setNewAddress({ ...newAddress, address: e.target.value })}
+                        placeholder="House / Shop No., Street, Area"
+                        className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
+                      />
+                    </div>
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">City *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newAddress.city}
+                          onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
+                          placeholder="e.g. Erode"
+                          className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">State</label>
+                        <input
+                          type="text"
+                          value={newAddress.state}
+                          onChange={(e) => setNewAddress({ ...newAddress, state: e.target.value })}
+                          placeholder="Tamil Nadu"
+                          className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Pincode *</label>
+                        <input
+                          type="text"
+                          required
+                          value={newAddress.pincode}
+                          onChange={(e) => setNewAddress({ ...newAddress, pincode: e.target.value })}
+                          placeholder="638001"
+                          className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddAddress(false)}
+                        className="px-3 py-1.5 border border-slate-300 rounded text-slate-600 font-bold"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="btn-primary px-4 py-1.5 rounded font-bold"
+                      >
+                        Save Address
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {addresses.length === 0 ? (
+                  <div className="text-center py-12 border border-dashed border-slate-200 rounded-lg">
+                    <MapPin className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <p className="text-xs text-slate-500 font-medium">No saved addresses yet</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Click &quot;+ Add Address&quot; above to add your primary shipping address</p>
+                  </div>
+                ) : (
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    {addresses.map((addr) => (
+                      <div
+                        key={addr.id}
+                        className={`p-4 rounded border ${
+                          addr.isDefault ? "border-[#0c2340] bg-slate-50/50" : "border-slate-200 bg-white"
+                        } shadow-sm text-xs space-y-2`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-[#0c2340] text-sm">{addr.label}</span>
+                          {addr.isDefault && (
+                            <span className="text-[10px] font-bold bg-[#0c2340] text-white px-2 py-0.2 rounded">
+                              DEFAULT
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-semibold text-slate-800">{addr.name}</p>
+                        <p className="text-slate-600 leading-relaxed">
+                          {addr.address}, {addr.city}, {addr.state} - {addr.pincode}
+                        </p>
+                        <p className="text-slate-500 font-medium">📞 {addr.phone}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -328,7 +525,7 @@ export default function ProfilePage() {
               <div className="space-y-6">
                 <div className="pb-3 border-b border-slate-200">
                   <h2 className="text-base font-extrabold text-[#0c2340]">Account & Business Settings</h2>
-                  <p className="text-xs text-slate-400">Update contact profile, GST details & trade preferences</p>
+                  <p className="text-xs text-slate-400">Your profile details registered in the Krishna Textiles database</p>
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-4 text-xs">
@@ -336,40 +533,42 @@ export default function ProfilePage() {
                     <label className="block font-bold text-slate-700 mb-1">Full Name / Contact Person</label>
                     <input
                       type="text"
-                      defaultValue="Rajesh Kumar"
-                      className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-slate-800 outline-none focus:border-[#0c2340]"
+                      disabled
+                      value={user.name || ""}
+                      className="w-full bg-slate-100 border border-slate-300 rounded px-3 py-2 text-slate-700 outline-none cursor-not-allowed"
                     />
                   </div>
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Mobile Number</label>
+                    <label className="block font-bold text-slate-700 mb-1">Mobile Contact Number</label>
                     <input
                       type="text"
-                      defaultValue="+91 98765 43210"
-                      className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-slate-800 outline-none focus:border-[#0c2340]"
+                      disabled
+                      value={user.phone || "Not specified"}
+                      className="w-full bg-slate-100 border border-slate-300 rounded px-3 py-2 text-slate-700 outline-none cursor-not-allowed"
                     />
                   </div>
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Email Address</label>
+                    <label className="block font-bold text-slate-700 mb-1">Registered Email Address</label>
                     <input
                       type="email"
-                      defaultValue="rajesh@krishnatextiles-partner.in"
-                      className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-slate-800 outline-none focus:border-[#0c2340]"
+                      disabled
+                      value={user.email || ""}
+                      className="w-full bg-slate-100 border border-slate-300 rounded px-3 py-2 text-slate-700 outline-none cursor-not-allowed"
                     />
                   </div>
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">GSTIN Number (Optional)</label>
+                    <label className="block font-bold text-slate-700 mb-1">Account Role</label>
                     <input
                       type="text"
-                      defaultValue="33AAAAA0000A1Z5"
-                      className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-slate-800 outline-none focus:border-[#0c2340]"
+                      disabled
+                      value={user.role || "CUSTOMER"}
+                      className="w-full bg-slate-100 border border-slate-300 rounded px-3 py-2 text-slate-700 outline-none cursor-not-allowed"
                     />
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-200 flex justify-end">
-                  <button className="btn-primary text-xs px-5 py-2 rounded">
-                    Save Profile Changes
-                  </button>
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+                  Profile information is securely synchronized with your verified Krishna Textiles database record.
                 </div>
               </div>
             )}

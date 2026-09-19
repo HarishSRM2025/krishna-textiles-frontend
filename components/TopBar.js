@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Truck, Phone, ShieldCheck, MapPin, Sparkles, ArrowRight } from "lucide-react";
+import { Truck, Phone, ShieldCheck, MapPin, Sparkles, ArrowRight, User } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 export default function TopBar() {
   const [announcement, setAnnouncement] = useState(null);
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     let isMounted = true;
@@ -75,12 +77,21 @@ export default function TopBar() {
             >
               <Phone size={11} className="text-[#d32f2f]" /> +91 421 249 8899
             </a>
-            <Link
-              href="/profile"
-              className="hidden sm:flex items-center gap-1 hover:text-white transition-colors"
-            >
-              <MapPin size={11} className="text-[#c59b27]" /> Track Order
-            </Link>
+            {isAuthenticated ? (
+              <Link
+                href="/profile"
+                className="hidden sm:flex items-center gap-1 hover:text-white transition-colors"
+              >
+                <MapPin size={11} className="text-[#c59b27]" /> Track Order
+              </Link>
+            ) : (
+              <Link
+                href="/signin"
+                className="hidden sm:flex items-center gap-1 hover:text-white transition-colors text-white font-semibold"
+              >
+                <User size={11} className="text-[#d32f2f]" /> Sign In
+              </Link>
+            )}
           </div>
         </div>
       </div>

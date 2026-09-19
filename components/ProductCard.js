@@ -4,10 +4,12 @@ import Link from "next/link";
 import { Heart, Star, ShoppingBag, Check, Tag } from "lucide-react";
 import { useState } from "react";
 import { useCart } from "./CartContext";
+import { useWishlist } from "@/context/WishlistContext";
 import { categoryIconMap } from "./Header";
 
 export default function ProductCard({ product }) {
-  const [wishlisted, setWishlisted] = useState(false);
+  const { isInWishlist, toggleWishlist } = useWishlist();
+  const wishlisted = isInWishlist(product.id);
   const [added, setAdded] = useState(false);
   const { addItem } = useCart();
 
@@ -40,7 +42,7 @@ export default function ProductCard({ product }) {
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            setWishlisted((v) => !v);
+            toggleWishlist(product);
           }}
           className="absolute top-2 right-2 z-10 w-7 h-7 rounded bg-white/90 hover:bg-white text-slate-400 hover:text-[#d32f2f] flex items-center justify-center shadow-sm border border-slate-200 transition-colors"
           aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}

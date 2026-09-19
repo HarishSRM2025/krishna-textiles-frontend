@@ -22,10 +22,12 @@ import {
   Info,
   Calendar,
   Loader2,
+  Heart,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import ProductCard from "@/components/ProductCard";
 import { useCart } from "@/components/CartContext";
+import { useWishlist } from "@/context/WishlistContext";
 import { categoryIconMap } from "@/components/Header";
 
 // Quantity-based pricing slabs
@@ -59,6 +61,7 @@ export default function ProductPage({ params }) {
   const { id } = params;
   const router = useRouter();
   const { addToCart } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist();
 
   const [product, setProduct] = useState(null);
   const [related, setRelated] = useState([]);
