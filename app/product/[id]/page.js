@@ -468,7 +468,7 @@ export default function ProductPage({ params }) {
 
             <div className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-white border border-slate-200 rounded px-2.5 py-1.5">
               <Clock size={12} className="text-[#c59b27] shrink-0" />
-              Orders placed before <strong>3 PM</strong> are dispatched the same day from our Erode warehouse.
+              Orders placed before <strong>3 PM</strong> are dispatched the same day from our Tiruchirappalli warehouse.
             </div>
           </div>
         </div>
