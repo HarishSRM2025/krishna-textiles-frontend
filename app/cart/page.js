@@ -339,93 +339,110 @@ export default function CartPage() {
   return (
     <div className="container-x py-8">
       {/* 3-STEP STEPPER HEADER */}
-      <div className="max-w-3xl mx-auto mb-8">
-        <div className="flex items-center justify-between relative">
-          {/* Background progress track */}
-          <div className="absolute top-1/2 left-0 right-0 h-1 bg-slate-200 -translate-y-1/2 z-0" />
-          <div
-            className="absolute top-1/2 left-0 h-1 bg-[#0c2340] -translate-y-1/2 z-0 transition-all duration-300"
-            style={{
-              width: currentStep === 1 ? "0%" : currentStep === 2 ? "50%" : "100%",
-            }}
-          />
-
-          {/* STEP 1 PILL */}
-          <button
-            onClick={() => setCurrentStep(1)}
-            className="relative z-10 flex flex-col items-center group cursor-pointer focus:outline-none"
-          >
+      <div className="max-w-xl mx-auto mb-8 px-4">
+        <div className="relative grid grid-cols-3">
+          {/* Background Connecting Line Track */}
+          <div className="absolute top-5 left-[16.67%] right-[16.67%] h-0.5 bg-slate-200 -translate-y-1/2 z-0">
+            {/* Active Connecting Line Fill */}
             <div
-              className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black transition-all ${
+              className="h-full bg-[#0c2340] transition-all duration-300"
+              style={{
+                width: currentStep === 1 ? "0%" : currentStep === 2 ? "50%" : "100%",
+              }}
+            />
+          </div>
+
+          {/* Step 1 */}
+          <div className="relative z-10 flex flex-col items-center text-center">
+            <button
+              onClick={() => setCurrentStep(1)}
+              className="focus:outline-none cursor-pointer group"
+              type="button"
+            >
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black transition-all ${
+                  currentStep === 1
+                    ? "bg-[#0c2340] text-white ring-4 ring-blue-100 shadow-md scale-105"
+                    : currentStep > 1
+                    ? "bg-green-600 text-white shadow-sm hover:opacity-90"
+                    : "bg-slate-200 text-slate-500"
+                }`}
+              >
+                {currentStep > 1 ? <Check size={16} /> : "1"}
+              </div>
+            </button>
+            <span
+              className={`mt-2 text-[11px] sm:text-xs font-bold leading-tight max-w-[120px] ${
                 currentStep === 1
-                  ? "bg-[#0c2340] text-white ring-4 ring-blue-100 shadow-sm"
+                  ? "text-[#0c2340]"
                   : currentStep > 1
-                  ? "bg-green-600 text-white"
-                  : "bg-slate-200 text-slate-500"
+                  ? "text-green-700"
+                  : "text-slate-400"
               }`}
             >
-              {currentStep > 1 ? <Check size={16} /> : "1"}
-            </div>
-            <span
-              className={`text-[11px] mt-2 font-bold transition-colors ${
-                currentStep === 1 ? "text-[#0c2340]" : "text-slate-500"
-              }`}
-            >
-              1. Cart Items & Delivery
+              1. Cart Items &amp; Delivery
             </span>
-          </button>
+          </div>
 
-          {/* STEP 2 PILL */}
-          <button
-            onClick={() => {
-              if (currentStep > 2) setCurrentStep(2);
-            }}
-            disabled={currentStep < 2}
-            className={`relative z-10 flex flex-col items-center group ${
-              currentStep >= 2 ? "cursor-pointer" : "cursor-not-allowed opacity-70"
-            } focus:outline-none`}
-          >
-            <div
-              className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black transition-all ${
-                currentStep === 2
-                  ? "bg-[#0c2340] text-white ring-4 ring-blue-100 shadow-sm"
-                  : currentStep > 2
-                  ? "bg-green-600 text-white"
-                  : "bg-slate-200 text-slate-500"
+          {/* Step 2 */}
+          <div className="relative z-10 flex flex-col items-center text-center">
+            <button
+              onClick={() => {
+                if (currentStep > 2) setCurrentStep(2);
+              }}
+              disabled={currentStep < 2}
+              className={`focus:outline-none ${
+                currentStep >= 2 ? "cursor-pointer group" : "cursor-not-allowed"
               }`}
+              type="button"
             >
-              {currentStep > 2 ? <Check size={16} /> : "2"}
-            </div>
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black transition-all ${
+                  currentStep === 2
+                    ? "bg-[#0c2340] text-white ring-4 ring-blue-100 shadow-md scale-105"
+                    : currentStep > 2
+                    ? "bg-green-600 text-white shadow-sm hover:opacity-90"
+                    : "bg-slate-200 text-slate-400"
+                }`}
+              >
+                {currentStep > 2 ? <Check size={16} /> : "2"}
+              </div>
+            </button>
             <span
-              className={`text-[11px] mt-2 font-bold transition-colors ${
-                currentStep === 2 ? "text-[#0c2340]" : "text-slate-500"
+              className={`mt-2 text-[11px] sm:text-xs font-bold leading-tight max-w-[120px] ${
+                currentStep === 2
+                  ? "text-[#0c2340]"
+                  : currentStep > 2
+                  ? "text-green-700"
+                  : "text-slate-400"
               }`}
             >
               2. Delivery Address
             </span>
-          </button>
+          </div>
 
-          {/* STEP 3 PILL */}
-          <div className="relative z-10 flex flex-col items-center">
+          {/* Step 3 */}
+          <div className="relative z-10 flex flex-col items-center text-center">
             <div
-              className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black transition-all ${
+              className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-black transition-all ${
                 currentStep === 3
-                  ? "bg-[#0c2340] text-white ring-4 ring-blue-100 shadow-sm"
-                  : "bg-slate-200 text-slate-500"
+                  ? "bg-[#0c2340] text-white ring-4 ring-blue-100 shadow-md scale-105"
+                  : "bg-slate-200 text-slate-400"
               }`}
             >
               3
             </div>
             <span
-              className={`text-[11px] mt-2 font-bold transition-colors ${
-                currentStep === 3 ? "text-[#0c2340]" : "text-slate-500"
+              className={`mt-2 text-[11px] sm:text-xs font-bold leading-tight max-w-[120px] ${
+                currentStep === 3 ? "text-[#0c2340]" : "text-slate-400"
               }`}
             >
-              3. Review & Order
+              3. Review &amp; Order
             </span>
           </div>
         </div>
       </div>
+
 
       {error && (
         <div className="max-w-4xl mx-auto mb-6 p-3.5 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs font-semibold">

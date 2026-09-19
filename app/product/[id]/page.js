@@ -119,14 +119,14 @@ export default function ProductPage({ params }) {
 
   function handleAdd() {
     if (isOutOfStock) return;
-    addToCart(product, size, qty, true, null, selectedColor?.name);
+    addToCart(product, size, qty, true, null, selectedColor?.name || null, selectedImage || null);
     setAdded(true);
     setTimeout(() => setAdded(false), 1800);
   }
 
   function handleBuyNow() {
     if (isOutOfStock) return;
-    addToCart(product, size, qty, false, null, selectedColor?.name);
+    addToCart(product, size, qty, false, null, selectedColor?.name || null, selectedImage || null);
     router.push("/cart");
   }
 
@@ -359,7 +359,8 @@ export default function ProductPage({ params }) {
                         type="button"
                         onClick={() => {
                           setSelectedColor(c);
-                          if (c.image) setSelectedImage(c.image);
+                          // Always update the displayed image: color's image if available, else fall back to product default
+                          setSelectedImage(c.image || null);
                         }}
                         className={`group flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold border transition-all cursor-pointer ${
                           isSelected
