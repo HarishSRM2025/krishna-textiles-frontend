@@ -213,6 +213,7 @@ export default function CartPage() {
           productId: i.id,
           productName: i.name,
           size: i.size || "Free Size",
+          color: i.color || undefined,
           quantity: i.qty,
           unitPrice: i.price,
         })),
@@ -460,11 +461,21 @@ export default function CartPage() {
                     className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center"
                   >
                     <div className="flex gap-3.5 items-center min-w-0">
-                      <div
-                        className="w-16 h-16 rounded border border-slate-200 flex items-center justify-center text-white shrink-0 font-bold"
-                        style={{ backgroundColor: item.color || "#0c2340" }}
-                      >
-                        <Icon size={24} />
+                      <div className="w-16 h-16 rounded border border-slate-200 overflow-hidden bg-slate-100 shrink-0">
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div
+                            className="w-full h-full flex items-center justify-center text-white font-bold"
+                            style={{ backgroundColor: "#0c2340" }}
+                          >
+                            <Icon size={24} />
+                          </div>
+                        )}
                       </div>
                       <div className="min-w-0">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
@@ -958,14 +969,25 @@ export default function CartPage() {
 
               <div className="divide-y divide-slate-100 text-xs">
                 {items.map((item) => (
-                  <div key={item.key} className="py-2.5 flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-slate-800">{item.name}</p>
-                      <p className="text-[11px] text-slate-500">
-                        Qty: <strong>{item.qty}</strong> · Size: <strong>{item.size}</strong> · Unit: ₹{item.price}
-                      </p>
+                  <div key={item.key} className="py-2.5 flex justify-between items-center gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {item.imageUrl && (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="w-10 h-12 rounded object-cover border border-slate-200 shrink-0"
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-800 truncate">{item.name}</p>
+                        <p className="text-[11px] text-slate-500">
+                          Qty: <strong>{item.qty}</strong> · Size: <strong>{item.size}</strong>
+                          {item.color && <> · Color: <strong>{item.color}</strong></>}
+                        </p>
+                        <p className="text-[11px] text-slate-500">Unit: ₹{item.price}</p>
+                      </div>
                     </div>
-                    <span className="font-extrabold text-[#0c2340]">
+                    <span className="font-extrabold text-[#0c2340] shrink-0">
                       ₹{(item.price * item.qty).toLocaleString()}
                     </span>
                   </div>
