@@ -310,24 +310,42 @@ export default function ProfilePage() {
 
                           {/* Order Items */}
                           <div className="p-3.5 divide-y divide-slate-100">
-                            {(order.items || []).map((item, idx) => (
-                              <div key={idx} className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3 text-xs">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded bg-[#0c2340] text-white flex items-center justify-center font-bold text-xs shrink-0">
-                                    <Shirt size={18} />
+                            {(order.items || []).map((item, idx) => {
+                              const itemImg = item.product?.imageUrl || item.imageUrl || item.product?.images?.[0];
+                              return (
+                                <div key={idx} className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3 text-xs">
+                                  <div className="flex items-center gap-3">
+                                    {itemImg ? (
+                                      <img
+                                        src={itemImg}
+                                        alt={item.productName || item.product?.name || "Product"}
+                                        className="w-12 h-12 rounded object-cover border border-slate-200 shrink-0 bg-slate-50 shadow-xs"
+                                        onError={(e) => {
+                                          e.target.onerror = null;
+                                          e.target.style.display = "none";
+                                          if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
+                                        }}
+                                      />
+                                    ) : null}
+                                    <div
+                                      className="w-12 h-12 rounded bg-[#0c2340] text-white flex items-center justify-center font-bold text-xs shrink-0"
+                                      style={{ display: itemImg ? "none" : "flex" }}
+                                    >
+                                      <Shirt size={18} />
+                                    </div>
+                                    <div>
+                                      <h4 className="font-bold text-slate-800">{item.productName || item.product?.name || "Textile Item"}</h4>
+                                      <span className="text-[11px] text-slate-500">
+                                        Qty: {item.quantity} {item.size ? `· Size: ${item.size}` : ""} {item.color ? `· Color: ${item.color}` : ""}
+                                      </span>
+                                    </div>
                                   </div>
-                                  <div>
-                                    <h4 className="font-bold text-slate-800">{item.productName || item.product?.name || "Textile Item"}</h4>
-                                    <span className="text-[11px] text-slate-500">
-                                      Qty: {item.quantity} {item.size ? `· Size: ${item.size}` : ""}
-                                    </span>
-                                  </div>
+                                  <span className="font-bold text-slate-800">
+                                    ₹{((item.unitPrice || 0) * (item.quantity || 1)).toLocaleString()}
+                                  </span>
                                 </div>
-                                <span className="font-bold text-slate-800">
-                                  ₹{((item.unitPrice || 0) * (item.quantity || 1)).toLocaleString()}
-                                </span>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
 
                           {/* Action footer */}

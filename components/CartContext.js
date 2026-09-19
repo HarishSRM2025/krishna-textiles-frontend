@@ -27,16 +27,17 @@ export function CartProvider({ children }) {
     }
   }, [items, loaded]);
 
-  function addToCart(product, size, qty = 1, openDrawer = true, customUnitPrice = null) {
+  function addToCart(product, size, qty = 1, openDrawer = true, customUnitPrice = null, color = null) {
     const rawCategory = product.category?.slug || product.categoryId || product.category || "";
     const basePrice = Number(product.price) || 0;
     const finalUnitPrice =
       customUnitPrice !== null
         ? Number(customUnitPrice)
         : calculateUnitPrice(basePrice, qty, rawCategory);
+    const itemColor = color || product.color || null;
 
     setItems((prev) => {
-      const key = `${product.id}-${size}`;
+      const key = `${product.id}-${size}${itemColor ? `-${itemColor}` : ""}`;
       const existing = prev.find((i) => i.key === key);
       if (existing) {
         const newQty = existing.qty + qty;
@@ -59,7 +60,8 @@ export function CartProvider({ children }) {
           basePrice,
           price: finalUnitPrice,
           mrp: product.mrp,
-          color: product.color,
+          imageUrl: product.imageUrl || (product.images && product.images[0]) || "",
+          color: itemColor,
           category: product.category,
           categorySlug: rawCategory,
           stock: product.stock,

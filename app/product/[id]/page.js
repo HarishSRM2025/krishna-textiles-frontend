@@ -54,6 +54,8 @@ export default function ProductPage({ params }) {
   const [notFound, setNotFound] = useState(false);
 
   const [size, setSize] = useState("");
+  const [selectedColor, setSelectedColor] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const [pincode, setPincode] = useState("");
@@ -69,6 +71,12 @@ export default function ProductPage({ params }) {
         if (!prod || !prod.id) { setNotFound(true); return; }
         setProduct(prod);
         setSize(prod.sizes?.[0] || "");
+        if (Array.isArray(prod.colors) && prod.colors.length > 0) {
+          setSelectedColor(prod.colors[0]);
+          if (prod.colors[0].image) {
+            setSelectedImage(prod.colors[0].image);
+          }
+        }
         // Fetch related products from same category
         if (prod.categoryId || prod.category?.id) {
           const categoryId = prod.categoryId || prod.category?.id;
@@ -111,14 +119,14 @@ export default function ProductPage({ params }) {
 
   function handleAdd() {
     if (isOutOfStock) return;
-    addToCart(product, size, qty, true);
+    addToCart(product, size, qty, true, null, selectedColor?.name);
     setAdded(true);
     setTimeout(() => setAdded(false), 1800);
   }
 
   function handleBuyNow() {
     if (isOutOfStock) return;
-    addToCart(product, size, qty, false);
+    addToCart(product, size, qty, false, null, selectedColor?.name);
     router.push("/cart");
   }
 
@@ -160,7 +168,7 @@ export default function ProductPage({ params }) {
   const catSlug = typeof product.category === 'string' ? product.category : (product.categoryRef?.slug || product.categoryId || "");
   const catName = typeof product.category === 'string' ? product.category.replace(/-/g, " ") : (product.categoryRef?.name || product.category?.name || catSlug);
   const brandName = typeof product.brand === "string" ? product.brand : (product.brandRef?.name || product.brand?.name || "");
-  const mainImage = product.imageUrl || (product.images && product.images[0]) || product.categoryRef?.image;
+  const mainImage = selectedImage || product.imageUrl || (product.images && product.images[0]) || product.categoryRef?.image;
   const IconComponent = categoryIconMap[catSlug] || Tag;
 
   return (
@@ -330,6 +338,51 @@ export default function ProductPage({ params }) {
                       {s}
                     </button>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Color Variants Options */}
+            {Array.isArray(product.colors) && product.colors.length > 0 && (
+              <div className="mb-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Select Color Shade: <strong className="text-[#0c2340]">{selectedColor?.name || "Standard"}</strong>
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {product.colors.map((c, idx) => {
+                    const isSelected = selectedColor?.name === c.name || (!selectedColor && idx === 0);
+                    return (
+                      <button
+                        key={c.id || idx}
+                        type="button"
+                        onClick={() => {
+                          setSelectedColor(c);
+                          if (c.image) setSelectedImage(c.image);
+                        }}
+                        className={`group flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold border transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-[#0c2340] text-white border-[#0c2340] shadow-sm"
+                            : "bg-white text-slate-700 border-slate-300 hover:border-slate-500"
+                        }`}
+                      >
+                        {c.image ? (
+                          <img
+                            src={c.image}
+                            alt={c.name}
+                            className="w-4 h-4 rounded-full object-cover border border-white/50 shrink-0"
+                          />
+                        ) : (
+                          <span
+                            className="w-3 h-3 rounded-full border border-slate-300 shrink-0 inline-block"
+                            style={{ backgroundColor: c.hex || "#0c2340" }}
+                          />
+                        )}
+                        <span>{c.name || `Color ${idx + 1}`}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
