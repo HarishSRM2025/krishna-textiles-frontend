@@ -69,9 +69,9 @@ export default function CartPage() {
     email: "",
     label: "Home",
     address: "",
-    city: "Erode",
-    state: "Tamil Nadu",
-    pincode: "638001",
+    city: "",
+    state: "",
+    pincode: "",
     saveForFuture: true,
   });
 
@@ -93,18 +93,6 @@ export default function CartPage() {
       setShowNewAddressForm(false);
     } else {
       setShowNewAddressForm(true);
-    }
-  }, [user]);
-
-  // Pre-fill new address form with user details
-  useEffect(() => {
-    if (user) {
-      setNewAddr((prev) => ({
-        ...prev,
-        name: prev.name || user.name || "",
-        phone: prev.phone || user.phone || "",
-        email: prev.email || user.email || "",
-      }));
     }
   }, [user]);
 
@@ -177,6 +165,17 @@ export default function CartPage() {
         setSavedAddresses(updated);
         setSelectedAddressId(updated[0]?.id);
         setShowNewAddressForm(false);
+        setNewAddr({
+          name: "",
+          phone: "",
+          email: "",
+          label: "Home",
+          address: "",
+          city: "",
+          state: "",
+          pincode: "",
+          saveForFuture: true,
+        });
       }
     } else {
       if (!selectedAddressId) {
@@ -195,7 +194,12 @@ export default function CartPage() {
     setSubmitting(true);
 
     const activeAddr = getActiveAddress();
-    const formattedAddress = `${activeAddr.address.trim()}, ${activeAddr.city.trim()}, ${activeAddr.state || "Tamil Nadu"} - ${activeAddr.pincode.trim()}`;
+    const addrParts = [activeAddr.address?.trim(), activeAddr.city?.trim()];
+    if (activeAddr.state?.trim()) addrParts.push(activeAddr.state.trim());
+    let formattedAddress = addrParts.filter(Boolean).join(", ");
+    if (activeAddr.pincode?.trim()) {
+      formattedAddress += ` - ${activeAddr.pincode.trim()}`;
+    }
 
     try {
       const payload = {
@@ -623,7 +627,20 @@ export default function CartPage() {
               {!showNewAddressForm && savedAddresses.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setShowNewAddressForm(true)}
+                  onClick={() => {
+                    setNewAddr({
+                      name: "",
+                      phone: "",
+                      email: "",
+                      label: "Home",
+                      address: "",
+                      city: "",
+                      state: "",
+                      pincode: "",
+                      saveForFuture: true,
+                    });
+                    setShowNewAddressForm(true);
+                  }}
                   className="btn-primary text-xs px-3 py-1.5 rounded flex items-center gap-1 cursor-pointer"
                 >
                   <Plus size={13} /> Add New Address
@@ -706,7 +723,7 @@ export default function CartPage() {
                       required
                       value={newAddr.name}
                       onChange={(e) => setNewAddr({ ...newAddr, name: e.target.value })}
-                      placeholder="e.g. Ramesh Kumar"
+                      placeholder="Recipient Full Name"
                       className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-slate-800 outline-none focus:border-[#0c2340]"
                     />
                   </div>
@@ -720,7 +737,7 @@ export default function CartPage() {
                       required
                       value={newAddr.phone}
                       onChange={(e) => setNewAddr({ ...newAddr, phone: e.target.value })}
-                      placeholder="e.g. 9876543210"
+                      placeholder="10-digit Mobile Number"
                       className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-slate-800 outline-none focus:border-[#0c2340]"
                     />
                   </div>
@@ -765,7 +782,7 @@ export default function CartPage() {
                       type="email"
                       value={newAddr.email}
                       onChange={(e) => setNewAddr({ ...newAddr, email: e.target.value })}
-                      placeholder="name@example.com"
+                      placeholder="name@example.com (optional)"
                       className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-slate-800 outline-none focus:border-[#0c2340]"
                     />
                   </div>
@@ -781,7 +798,7 @@ export default function CartPage() {
                       required
                       value={newAddr.city}
                       onChange={(e) => setNewAddr({ ...newAddr, city: e.target.value })}
-                      placeholder="e.g. Erode / Coimbatore"
+                      placeholder="City / District"
                       className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-slate-800 outline-none focus:border-[#0c2340]"
                     />
                   </div>
@@ -795,7 +812,7 @@ export default function CartPage() {
                       required
                       value={newAddr.state}
                       onChange={(e) => setNewAddr({ ...newAddr, state: e.target.value })}
-                      placeholder="Tamil Nadu"
+                      placeholder="State"
                       className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-slate-800 outline-none focus:border-[#0c2340]"
                     />
                   </div>
@@ -809,7 +826,7 @@ export default function CartPage() {
                       required
                       value={newAddr.pincode}
                       onChange={(e) => setNewAddr({ ...newAddr, pincode: e.target.value })}
-                      placeholder="638001"
+                      placeholder="6-digit Pincode"
                       className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 text-slate-800 outline-none focus:border-[#0c2340]"
                     />
                   </div>

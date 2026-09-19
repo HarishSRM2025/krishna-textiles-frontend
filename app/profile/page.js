@@ -53,9 +53,9 @@ export default function ProfilePage() {
     label: "Home",
     name: "",
     address: "",
-    city: "Erode",
-    state: "Tamil Nadu",
-    pincode: "638001",
+    city: "",
+    state: "",
+    pincode: "",
     phone: "",
   });
 
@@ -133,8 +133,8 @@ export default function ProfilePage() {
     if (!newAddress.address.trim() || !newAddress.city.trim() || !newAddress.pincode.trim()) return;
     const updated = addSavedAddress(user.id, {
       ...newAddress,
-      name: newAddress.name?.trim() || user.name || "Customer",
-      phone: newAddress.phone?.trim() || user.phone || "",
+      name: newAddress.name?.trim() || "",
+      phone: newAddress.phone?.trim() || "",
       email: user.email || "",
     });
     setAddresses(updated);
@@ -142,9 +142,9 @@ export default function ProfilePage() {
       label: "Home",
       name: "",
       address: "",
-      city: "Erode",
-      state: "Tamil Nadu",
-      pincode: "638001",
+      city: "",
+      state: "",
+      pincode: "",
       phone: "",
     });
     setShowAddAddress(false);
@@ -447,7 +447,7 @@ export default function ProfilePage() {
                           required
                           value={newAddress.name}
                           onChange={(e) => setNewAddress({ ...newAddress, name: e.target.value })}
-                          placeholder={user.name || "e.g. Ramesh Kumar"}
+                          placeholder="Recipient Name"
                           className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
                         />
                       </div>
@@ -458,7 +458,7 @@ export default function ProfilePage() {
                           required
                           value={newAddress.phone}
                           onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
-                          placeholder={user.phone || "e.g. 9876543210"}
+                          placeholder="10-digit Mobile Number"
                           className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
                         />
                       </div>
@@ -495,7 +495,7 @@ export default function ProfilePage() {
                           required
                           value={newAddress.city}
                           onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
-                          placeholder="e.g. Erode / Coimbatore / Tiruppur"
+                          placeholder="City / District"
                           className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
                         />
                       </div>
@@ -505,7 +505,7 @@ export default function ProfilePage() {
                           type="text"
                           value={newAddress.state}
                           onChange={(e) => setNewAddress({ ...newAddress, state: e.target.value })}
-                          placeholder="Tamil Nadu"
+                          placeholder="State"
                           className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
                         />
                       </div>
@@ -516,7 +516,7 @@ export default function ProfilePage() {
                           required
                           value={newAddress.pincode}
                           onChange={(e) => setNewAddress({ ...newAddress, pincode: e.target.value })}
-                          placeholder="638001"
+                          placeholder="6-digit Pincode"
                           className="w-full bg-white border border-slate-300 rounded px-2.5 py-1.5"
                         />
                       </div>
