@@ -71,12 +71,9 @@ export default function ProductPage({ params }) {
         if (!prod || !prod.id) { setNotFound(true); return; }
         setProduct(prod);
         setSize(prod.sizes?.[0] || "");
-        if (Array.isArray(prod.colors) && prod.colors.length > 0) {
-          setSelectedColor(prod.colors[0]);
-          if (prod.colors[0].image) {
-            setSelectedImage(prod.colors[0].image);
-          }
-        }
+        // Do NOT auto-select color on load; keep default main product image active until manually chosen
+        setSelectedColor(null);
+        setSelectedImage(null);
         // Fetch related products from same category
         if (prod.categoryId || prod.category?.id) {
           const categoryId = prod.categoryId || prod.category?.id;
@@ -168,7 +165,13 @@ export default function ProductPage({ params }) {
   const catSlug = typeof product.category === 'string' ? product.category : (product.categoryRef?.slug || product.categoryId || "");
   const catName = typeof product.category === 'string' ? product.category.replace(/-/g, " ") : (product.categoryRef?.name || product.category?.name || catSlug);
   const brandName = typeof product.brand === "string" ? product.brand : (product.brandRef?.name || product.brand?.name || "");
-  const mainImage = selectedImage || product.imageUrl || (product.images && product.images[0]) || product.categoryRef?.image;
+  const defaultMainImage = product.imageUrl || (product.images && product.images[0]) || product.categoryRef?.image;
+  const mainImage = selectedImage || defaultMainImage;
+  const allThumbnails = [
+    product.imageUrl,
+    ...(Array.isArray(product.images) ? product.images : []),
+    ...(Array.isArray(product.colors) ? product.colors.map((c) => c.image).filter(Boolean) : []),
+  ].filter(Boolean).filter((val, idx, arr) => arr.indexOf(val) === idx);
   const IconComponent = categoryIconMap[catSlug] || Tag;
 
   return (
@@ -192,36 +195,62 @@ export default function ProductPage({ params }) {
 
       {/* Main Product Card */}
       <div className="grid lg:grid-cols-2 gap-8 bg-white p-4 sm:p-6 rounded border border-slate-200 shadow-sm mb-6">
-        {/* Product Visual Box */}
-        <div className="relative rounded border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center min-h-[320px] sm:min-h-[420px]">
-          {mainImage ? (
-            <img
-              src={mainImage}
-              alt={product.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <>
-              {product.discount > 0 && (
-                <span className="badge-discount z-10">{product.discount}% OFF</span>
-              )}
-              <div
-                className="w-full h-full p-8 flex flex-col items-center justify-center"
-                style={{
-                  background: `linear-gradient(145deg, ${product.color || "#0c2340"}15, ${product.color || "#0c2340"}35)`,
-                }}
-              >
+        {/* Product Visual Box & Gallery */}
+        <div className="flex flex-col gap-3">
+          <div className="relative rounded border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center min-h-[320px] sm:min-h-[420px]">
+            {mainImage ? (
+              <img
+                src={mainImage}
+                alt={product.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <>
+                {product.discount > 0 && (
+                  <span className="badge-discount z-10">{product.discount}% OFF</span>
+                )}
                 <div
-                  className="w-28 h-28 rounded-md flex items-center justify-center text-white shadow-md mb-4"
-                  style={{ backgroundColor: product.color || "#0c2340" }}
+                  className="w-full h-full p-8 flex flex-col items-center justify-center"
+                  style={{
+                    background: `linear-gradient(145deg, ${product.color || "#0c2340"}15, ${product.color || "#0c2340"}35)`,
+                  }}
                 >
-                  <IconComponent size={56} />
+                  <div
+                    className="w-28 h-28 rounded-md flex items-center justify-center text-white shadow-md mb-4"
+                    style={{ backgroundColor: product.color || "#0c2340" }}
+                  >
+                    <IconComponent size={56} />
+                  </div>
+                  <span className="text-xs font-black uppercase tracking-widest text-[#0c2340] bg-white px-3 py-1 rounded border border-slate-300 shadow-sm">
+                    {brandName ? `${brandName} ORIGINAL` : 'GENUINE TEXTILE'}
+                  </span>
                 </div>
-                <span className="text-xs font-black uppercase tracking-widest text-[#0c2340] bg-white px-3 py-1 rounded border border-slate-300 shadow-sm">
-                  {brandName ? `${brandName} ORIGINAL` : 'GENUINE TEXTILE'}
-                </span>
-              </div>
-            </>
+              </>
+            )}
+          </div>
+
+          {/* Thumbnails list if multiple views exist */}
+          {allThumbnails.length > 1 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {allThumbnails.map((thumbUrl, idx) => {
+                const isActive = (selectedImage === thumbUrl) || (!selectedImage && thumbUrl === defaultMainImage);
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setSelectedImage(thumbUrl)}
+                    className={`w-14 h-14 rounded-lg border overflow-hidden shrink-0 transition-all cursor-pointer ${
+                      isActive
+                        ? "border-[#0c2340] ring-2 ring-[#0c2340]/40 shadow-xs"
+                        : "border-slate-200 opacity-60 hover:opacity-100 hover:border-slate-400"
+                    }`}
+                    title={thumbUrl === defaultMainImage ? "Main Product Image" : `View ${idx + 1}`}
+                  >
+                    <img src={thumbUrl} alt="" className="w-full h-full object-cover" />
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
 
@@ -347,24 +376,42 @@ export default function ProductPage({ params }) {
               <div className="mb-4">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                    Select Color Shade: <strong className="text-[#0c2340]">{selectedColor?.name || "Standard"}</strong>
+                    Select Color Shade: <strong className="text-[#0c2340]">{selectedColor ? selectedColor.name : "None selected (Original View)"}</strong>
                   </span>
+                  {selectedColor && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedColor(null);
+                        setSelectedImage(null);
+                      }}
+                      className="text-[11px] text-[#0c2340] hover:underline font-semibold cursor-pointer"
+                    >
+                      Reset to Main Image
+                    </button>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {product.colors.map((c, idx) => {
-                    const isSelected = selectedColor?.name === c.name || (!selectedColor && idx === 0);
+                    const isSelected = selectedColor?.name === c.name;
                     return (
                       <button
                         key={c.id || idx}
                         type="button"
                         onClick={() => {
-                          setSelectedColor(c);
-                          // Always update the displayed image: color's image if available, else fall back to product default
-                          setSelectedImage(c.image || null);
+                          if (isSelected) {
+                            setSelectedColor(null);
+                            setSelectedImage(null);
+                          } else {
+                            setSelectedColor(c);
+                            if (c.image) {
+                              setSelectedImage(c.image);
+                            }
+                          }
                         }}
                         className={`group flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold border transition-all cursor-pointer ${
                           isSelected
-                            ? "bg-[#0c2340] text-white border-[#0c2340] shadow-sm"
+                            ? "bg-[#0c2340] text-white border-[#0c2340] shadow-sm ring-2 ring-[#0c2340]/20"
                             : "bg-white text-slate-700 border-slate-300 hover:border-slate-500"
                         }`}
                       >

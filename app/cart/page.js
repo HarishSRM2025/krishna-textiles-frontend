@@ -1172,56 +1172,6 @@ export default function CartPage() {
                     </div>
                   </div>
                 </label>
-
-                <label
-                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                    paymentMethod === "CASH_ON_DELIVERY"
-                      ? "border-[#0c2340] bg-blue-50/40 ring-1 ring-[#0c2340]"
-                      : "border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="CASH_ON_DELIVERY"
-                    checked={paymentMethod === "CASH_ON_DELIVERY"}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="accent-[#0c2340] cursor-pointer"
-                  />
-                  <div>
-                    <span className="font-bold text-slate-900 block">
-                      Cash on Delivery (COD)
-                    </span>
-                    <span className="text-slate-500 text-[11px]">
-                      Pay cash or UPI upon delivery at your doorstep
-                    </span>
-                  </div>
-                </label>
-
-                <label
-                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                    paymentMethod === "NET_BANKING"
-                      ? "border-[#0c2340] bg-blue-50/40 ring-1 ring-[#0c2340]"
-                      : "border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="NET_BANKING"
-                    checked={paymentMethod === "NET_BANKING"}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="accent-[#0c2340] cursor-pointer"
-                  />
-                  <div>
-                    <span className="font-bold text-slate-900 block">
-                      Direct Mill Bank Transfer (NEFT / RTGS)
-                    </span>
-                    <span className="text-slate-500 text-[11px]">
-                      For bulk and boutique orders via official bank account
-                    </span>
-                  </div>
-                </label>
               </div>
             </div>
           </div>
