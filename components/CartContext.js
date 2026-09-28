@@ -23,7 +23,22 @@ export function CartProvider({ children }) {
 
   useEffect(() => {
     if (loaded) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      try {
+        // Strip base64 image data before persisting to localStorage —
+        // base64 images can be 10-100KB each and quickly exceed the 5MB localStorage limit.
+        // HTTP/HTTPS image URLs are kept; base64 data URIs are cleared (they'll fall back to
+        // the icon placeholder on next page load, which is acceptable).
+        const persistable = items.map((item) => ({
+          ...item,
+          imageUrl:
+            item.imageUrl && !item.imageUrl.startsWith("data:")
+              ? item.imageUrl
+              : "",
+        }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
+      } catch (e) {
+        // localStorage full or unavailable — silently ignore
+      }
     }
   }, [items, loaded]);
 
