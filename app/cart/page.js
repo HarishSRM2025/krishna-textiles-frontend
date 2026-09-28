@@ -28,6 +28,7 @@ import {
   addSavedAddress,
   setDefaultSavedAddress,
 } from "@/lib/addresses";
+import { loadRazorpayScript } from "@/lib/razorpay";
 
 // Helper to calculate expected delivery date string
 function getDeliveryDateString(minDays = 3, maxDays = 5) {
@@ -76,7 +77,7 @@ export default function CartPage() {
   });
 
   // Payment method
-  const [paymentMethod, setPaymentMethod] = useState("ONLINE_GPAY");
+  const [paymentMethod, setPaymentMethod] = useState("RAZORPAY");
 
   // Submission / error state
   const [submitting, setSubmitting] = useState(false);
@@ -188,7 +189,7 @@ export default function CartPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Step 3: Place real order
+  // Step 3: Place real order (Razorpay or COD)
   const handlePlaceOrder = async () => {
     setError("");
     setSubmitting(true);
@@ -201,24 +202,110 @@ export default function CartPage() {
       formattedAddress += ` - ${activeAddr.pincode.trim()}`;
     }
 
-    try {
-      const payload = {
-        // Do NOT send raw user.id as customerId to avoid foreign key violation
-        customerName: activeAddr.name.trim(),
-        customerPhone: activeAddr.phone.trim(),
-        customerEmail: activeAddr.email ? activeAddr.email.trim() : (user?.email || undefined),
-        shippingAddress: formattedAddress,
-        paymentMethod,
-        items: items.map((i) => ({
-          productId: i.id,
-          productName: i.name,
-          size: i.size || "Free Size",
-          color: i.color || undefined,
-          quantity: i.qty,
-          unitPrice: i.price,
-        })),
-      };
+    const payload = {
+      customerName: activeAddr.name.trim(),
+      customerPhone: activeAddr.phone.trim(),
+      customerEmail: activeAddr.email ? activeAddr.email.trim() : (user?.email || undefined),
+      shippingAddress: formattedAddress,
+      paymentMethod,
+      items: items.map((i) => ({
+        productId: i.id,
+        productName: i.name,
+        size: i.size || "Free Size",
+        color: i.color || undefined,
+        quantity: i.qty,
+        unitPrice: i.price,
+      })),
+    };
 
+    // RAZORPAY PAYMENT FLOW
+    if (paymentMethod === "RAZORPAY") {
+      try {
+        const isLoaded = await loadRazorpayScript();
+        if (!isLoaded || typeof window.Razorpay === "undefined") {
+          throw new Error("Razorpay checkout SDK failed to load. Please check your internet connection.");
+        }
+
+        // 1. Create order on backend (receives razorpay order ID and key ID)
+        const rzpOrderRes = await api.razorpay.createOrder(total, undefined, {
+          customerName: activeAddr.name.trim(),
+          phone: activeAddr.phone.trim(),
+        });
+        const rzpOrder = rzpOrderRes?.data || rzpOrderRes;
+
+        if (!rzpOrder?.id) {
+          throw new Error("Failed to initialize Razorpay checkout session on server.");
+        }
+
+        const options = {
+          key: rzpOrder.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_ThMMNStuG17mBM",
+          amount: rzpOrder.amount,
+          currency: rzpOrder.currency || "INR",
+          name: "Krishna Textiles Pvt Ltd",
+          description: `Order Payment (${items.length} product${items.length > 1 ? "s" : ""})`,
+          order_id: rzpOrder.id,
+          prefill: {
+            name: activeAddr.name.trim(),
+            contact: activeAddr.phone.trim(),
+            email: activeAddr.email ? activeAddr.email.trim() : (user?.email || ""),
+          },
+          notes: {
+            shippingAddress: formattedAddress,
+            app: "Krishna Textiles Direct Mill Storefront",
+          },
+          theme: {
+            color: "#0c2340", // Brand Navy
+          },
+          handler: async function (response) {
+            try {
+              setSubmitting(true);
+              const verifyRes = await api.razorpay.verifyPayment({
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+                orderData: payload,
+              });
+
+              if (verifyRes?.data) {
+                setPlacedOrder(verifyRes.data);
+                clearCart();
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              } else {
+                throw new Error("Payment verified, but server order record creation failed.");
+              }
+            } catch (vErr) {
+              console.error("Razorpay verification failed:", vErr);
+              setError(vErr.message || "Payment verification failed. Please contact mill customer support.");
+            } finally {
+              setSubmitting(false);
+            }
+          },
+          modal: {
+            ondismiss: function () {
+              setSubmitting(false);
+            },
+          },
+        };
+
+        const razorpayInstance = new window.Razorpay(options);
+        razorpayInstance.on("payment.failed", function (resp) {
+          console.error("Razorpay payment failure event:", resp);
+          setError(
+            resp.error?.description || "Payment was declined or cancelled. Please try again."
+          );
+          setSubmitting(false);
+        });
+        razorpayInstance.open();
+      } catch (err) {
+        console.error("Razorpay initiation error:", err);
+        setError(err.message || "Failed to initialize payment gateway. Please try again.");
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // CASH ON DELIVERY / OFFLINE BANK FLOW
+    try {
       const res = await api.orders.create(payload);
       if (res?.data) {
         setPlacedOrder(res.data);
@@ -276,6 +363,34 @@ export default function CartPage() {
             <span className="text-slate-500 font-medium">Delivery Destination:</span>
             <span className="font-medium text-slate-700 text-right max-w-[260px] truncate">
               {placedOrder.shippingAddress}
+            </span>
+          </div>
+          <div className="flex justify-between py-1.5 border-b border-slate-100">
+            <span className="text-slate-500 font-medium">Payment Mode:</span>
+            <span className="font-bold text-[#0c2340]">
+              {placedOrder.paymentMethod === "RAZORPAY"
+                ? "Razorpay Online (UPI/Cards/NetBanking)"
+                : placedOrder.paymentMethod === "CASH_ON_DELIVERY"
+                ? "Cash on Delivery (COD)"
+                : placedOrder.paymentMethod || "Online"}
+            </span>
+          </div>
+          {placedOrder.razorpayPaymentId && (
+            <div className="flex justify-between py-1.5 border-b border-slate-100">
+              <span className="text-slate-500 font-medium">Razorpay Payment ID:</span>
+              <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                {placedOrder.razorpayPaymentId}
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between py-1.5 border-b border-slate-100">
+            <span className="text-slate-500 font-medium">Payment Status:</span>
+            <span className={`font-bold px-2 py-0.5 rounded ${
+              placedOrder.paymentStatus === "PAID"
+                ? "text-emerald-700 bg-emerald-50"
+                : "text-amber-700 bg-amber-50"
+            }`}>
+              {placedOrder.paymentStatus || "PAID"}
             </span>
           </div>
           <div className="flex justify-between py-1.5">
@@ -1021,27 +1136,40 @@ export default function CartPage() {
 
               <div className="space-y-2.5 text-xs">
                 <label
-                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                    paymentMethod === "ONLINE_GPAY"
-                      ? "border-[#0c2340] bg-blue-50/40 ring-1 ring-[#0c2340]"
+                  className={`flex items-start gap-3 p-3.5 rounded-lg border cursor-pointer transition-all ${
+                    paymentMethod === "RAZORPAY"
+                      ? "border-[#0c2340] bg-blue-50/50 ring-2 ring-[#0c2340]/20 shadow-sm"
                       : "border-slate-200 hover:bg-slate-50"
                   }`}
                 >
                   <input
                     type="radio"
                     name="paymentMethod"
-                    value="ONLINE_GPAY"
-                    checked={paymentMethod === "ONLINE_GPAY"}
+                    value="RAZORPAY"
+                    checked={paymentMethod === "RAZORPAY"}
                     onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="accent-[#0c2340] cursor-pointer"
+                    className="accent-[#0c2340] cursor-pointer mt-0.5"
                   />
-                  <div>
-                    <span className="font-bold text-slate-900 block">
-                      Google Pay / UPI / Instant Pay
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between flex-wrap gap-1">
+                      <span className="font-extrabold text-slate-900 text-xs">
+                        Razorpay Secure Checkout
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full">
+                        Recommended · Instant Verification
+                      </span>
+                    </div>
+                    <span className="text-slate-600 text-[11px] block mt-0.5 leading-relaxed">
+                      UPI (Google Pay, PhonePe, Paytm), Credit & Debit Cards, NetBanking & Wallets
                     </span>
-                    <span className="text-slate-500 text-[11px]">
-                      Instant payment verification & priority dispatch
-                    </span>
+                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100/80">
+                      <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                        256-Bit SSL Encrypted
+                      </span>
+                      <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                        Test Sandbox Active
+                      </span>
+                    </div>
                   </div>
                 </label>
 
@@ -1142,11 +1270,15 @@ export default function CartPage() {
               className="btn-red w-full py-3.5 rounded font-bold text-xs flex items-center justify-center gap-2 shadow disabled:opacity-60 cursor-pointer"
             >
               {submitting ? (
-                <span>Placing Order in Database...</span>
+                <span>{paymentMethod === "RAZORPAY" ? "Connecting to Razorpay..." : "Placing Order in Database..."}</span>
               ) : (
                 <>
                   <CheckCircle2 size={16} />
-                  <span>Confirm & Place Order (₹{total.toLocaleString()})</span>
+                  <span>
+                    {paymentMethod === "RAZORPAY"
+                      ? `Pay ₹${total.toLocaleString()} via Razorpay`
+                      : `Confirm & Place Order (₹${total.toLocaleString()})`}
+                  </span>
                 </>
               )}
             </button>
