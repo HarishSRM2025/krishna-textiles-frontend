@@ -101,12 +101,25 @@ export default function CartOffcanvas() {
             ) : (
               items.map((item) => (
                 <div key={item.key} className="py-3.5 flex gap-3 items-start">
-                  {/* Item Color Box */}
-                  <div
-                    className="w-16 h-16 rounded border border-slate-200 shrink-0 flex items-center justify-center text-white font-bold text-xs shadow-inner"
-                    style={{ backgroundColor: item.color || "#0c2340" }}
-                  >
-                    {item.brand ? item.brand.slice(0, 3).toUpperCase() : "KT"}
+                  {/* Item Image / Fallback Colour Block */}
+                  <div className="w-16 h-16 rounded border border-slate-200 shrink-0 overflow-hidden bg-slate-100">
+                    {item.imageUrl ? (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                          e.target.nextSibling.style.display = "flex";
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`w-full h-full items-center justify-center text-white font-bold text-xs ${item.imageUrl ? "hidden" : "flex"}`}
+                      style={{ backgroundColor: item.color || "#0c2340" }}
+                    >
+                      {item.brand ? item.brand.slice(0, 3).toUpperCase() : "KT"}
+                    </div>
                   </div>
 
                   <div className="flex-1 min-w-0">

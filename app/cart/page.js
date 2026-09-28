@@ -595,11 +595,23 @@ export default function CartPage() {
                     <div className="flex gap-3.5 items-center min-w-0">
                       <div className="w-16 h-16 rounded border border-slate-200 overflow-hidden bg-slate-100 shrink-0">
                         {item.imageUrl ? (
-                          <img
-                            src={item.imageUrl}
-                            alt={item.name}
-                            className="w-full h-full object-cover"
-                          />
+                          <>
+                            <img
+                              src={item.imageUrl}
+                              alt={item.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.target.style.display = "none";
+                                e.target.nextSibling.style.display = "flex";
+                              }}
+                            />
+                            <div
+                              className="w-full h-full items-center justify-center text-white font-bold"
+                              style={{ backgroundColor: "#0c2340", display: "none" }}
+                            >
+                              <Icon size={24} />
+                            </div>
+                          </>
                         ) : (
                           <div
                             className="w-full h-full flex items-center justify-center text-white font-bold"
